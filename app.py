@@ -56,8 +56,24 @@ if st.button("🚀 Iniciar Caçada de Leads", use_container_width=True):
         os.environ["GEMINI_API_KEY"] = chave_api
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         
-        agente_dados = Agent(role="Analista de Dados", goal="Consultar o CNPJ na Receita Federal e entregar os sócios.", backstory="Você é preciso.", tools=[consulta_receita], verbose=False, llm=llm)
-        agente_sdr = Agent(role="SDR Especialista", goal="Escrever e-mails baseados no contrato vencido.", backstory="Você é um Closer de elite na Next Tier Up. Escreva abordagens diretas.", verbose=False, llm=llm)
+                agente_dados = Agent(
+            role="Analista de Dados", 
+            goal="Consultar o CNPJ na Receita Federal e entregar os sócios.", 
+            backstory="Você é preciso.", 
+            tools=[consulta_receita], 
+            verbose=False, 
+            llm=llm,
+            allow_delegation=False
+        )
+        agente_sdr = Agent(
+            role="SDR Especialista", 
+            goal="Escrever e-mails baseados no contrato vencido.", 
+            backstory="Você é um Closer de elite na Next Tier Up. Escreva abordagens diretas.", 
+            verbose=False, 
+            llm=llm,
+            allow_delegation=False
+        )
+        
         
         with st.spinner("Conectando ao Portal do Governo (PNCP)..."):
             leads = buscar_vencedores_pncp_hoje()
