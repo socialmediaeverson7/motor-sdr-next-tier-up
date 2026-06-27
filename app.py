@@ -10,7 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 st.set_page_config(page_title="Motor SDR - Next Tier Up", page_icon="🚀", layout="wide")
 
 st.title("🎯 Motor SDR Autônomo - Next Tier Up")
-st.markdown("Prospecção B2B baseada em sinais (Signal-Based Selling) de licitações públicas.")
+st.markdown("Prospecção B2B baseada em sinais de licitações públicas.")
 
 with st.sidebar:
     st.header("⚙️ Configurações")
@@ -38,7 +38,6 @@ def buscar_vencedores_pncp_hoje():
 def consulta_receita(cnpj: str) -> str:
     """Consulta um CNPJ na Receita Federal para descobrir os donos e sócios da empresa."""
     cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
-    
     url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
     resposta = requests.get(url)
     if resposta.status_code == 200:
@@ -51,54 +50,40 @@ def consulta_receita(cnpj: str) -> str:
 
 if st.button("🚀 Iniciar Caçada de Leads", use_container_width=True):
     if not chave_api:
-        st.error("⚠️ Por favor, insira a sua chave do Gemini na barra lateral antes de começar.")
+        st.error("⚠️ Por favor, insira a sua chave do Gemini.")
     else:
         os.environ["GEMINI_API_KEY"] = chave_api
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         
+        # Agentes simplificados para evitar erro de validação do Pydantic
         agente_dados = Agent(
             role="Analista de Dados",
             goal="Consultar o CNPJ na Receita Federal e entregar os sócios.",
-            backstory="Você é preciso.",
+            backstory="Você é um especialista em dados corporativos.",
             tools=[consulta_receita],
-            verbose=False,
-            llm=llm,
-            allow_delegation=False
+            llm=llm
         )
+        
         agente_sdr = Agent(
             role="SDR Especialista",
             goal="Escrever e-mails baseados no contrato vencido.",
-            backstory="Você é um Closer de elite na Next Tier Up. Escreva abordagens diretas.",
-            verbose=False,
-            llm=llm,
-            allow_delegation=False
+            backstory="Você é um Closer de elite na Next Tier Up.",
+            llm=llm
         )
         
-        with st.spinner("Conectando ao Portal do Governo (PNCP)..."):
+        with st.spinner("Conectando ao PNCP..."):
             leads = buscar_vencedores_pncp_hoje()
             
         if not leads:
-            st.warning("Nenhum contrato novo encontrado hoje no PNCP.")
+            st.warning("Nenhum contrato novo encontrado hoje.")
         else:
-            st.success(f"🔥 Encontrados {len(leads)} leads quentes! Acordando Agentes de IA...")
-            barra_progresso = st.progress(0)
-            
-            for indice, lead in enumerate(leads):
-                with st.expander(f"⚙️ Processando: {lead['empresa']}", expanded=True):
-                    st.write(f"**Contrato Vencido:** {lead['objeto']}")
-                    
-                    tarefa_investigacao = Task(description=f"Consulte o CNPJ {lead['cnpj']} na Receita. Identifique os sócios.", expected_output="Nome dos sócios.", agent=agente_dados)
-                    tarefa_venda = Task(description=f"Escreva um e-mail para o Sócio sobre a vitória neste contrato: '{lead['objeto']}'.", expected_output="E-mail comercial.", agent=agente_sdr)
+            st.success(f"🔥 Encontrados {len(leads)} leads!")
+            for lead in leads:
+                with st.expander(f"Processando: {lead['empresa']}", expanded=True):
+                    tarefa_investigacao = Task(description=f"Consulte o CNPJ {lead['cnpj']}.", expected_output="Lista de sócios.", agent=agente_dados)
+                    tarefa_venda = Task(description=f"Escreva e-mail para o Sócio sobre: '{lead['objeto']}'.", expected_output="E-mail comercial.", agent=agente_sdr)
                     
                     equipe = Crew(agents=[agente_dados, agente_sdr], tasks=[tarefa_investigacao, tarefa_venda], process=Process.sequential)
                     resultado = equipe.kickoff()
-                    
-                    st.info("E-mail Gerado com Sucesso:")
                     st.markdown(resultado)
-                
-                barra_progresso.progress((indice + 1) / len(leads))
-                time.sleep(2)
-                
-            st.balloons()
-            st.success("✅ Prospecção Finalizada!")
-            
+
