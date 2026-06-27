@@ -5,7 +5,9 @@ from datetime import datetime
 import streamlit as st
 from crewai import Agent, Task, Crew, Process
 
-# Configurações de segurança contra erros de infraestrutura
+# AQUI: Importamos o motor oficial do Google que agora será aceito!
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGSMITH_API_KEY"] = "disabled"
@@ -18,7 +20,6 @@ with st.sidebar:
     st.header("⚙️ Configurações")
     chave_api = st.text_input("Cole sua Chave do Gemini:", type="password")
 
-# --- FUNÇÃO REAL: Busca de contratos vencidos hoje no Portal Nacional ---
 def buscar_vencedores_pncp_hoje():
     hoje = datetime.now().strftime("%Y%m%d")
     url = f"https://pncp.gov.br/api/consulta/v1/contratos?dataInicial={hoje}&dataFinal={hoje}&pagina=1"
@@ -28,7 +29,6 @@ def buscar_vencedores_pncp_hoje():
         lista_cnpjs = []
         if resposta.status_code == 200:
             dados = resposta.json()
-            # Pegamos os 3 primeiros contratos do dia para teste
             for contrato in dados.get('data', [])[:3]: 
                 cnpj = contrato.get('niFornecedor')
                 nome_empresa = contrato.get('nomeRazaoSocialFornecedor')
@@ -48,14 +48,14 @@ if st.button("🚀 Iniciar Caçada de Leads"):
         os.environ["GEMINI_API_KEY"] = chave_api
         
         try:
-            # O nome do modelo
-            modelo_gemini = "gemini/gemini-1.5-flash-latest"
+            # Motor nativo ativado: Adeus erro 404!
+            motor_gemini = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
             
             agente_dados = Agent(
                 role="Analista de Inteligência", 
                 goal="Analisar a empresa que ganhou a licitação e traçar um perfil corporativo.", 
                 backstory="Você é um expert em inteligência de mercado B2B.", 
-                llm=modelo_gemini,
+                llm=motor_gemini,
                 allow_delegation=False
             )
             
@@ -63,7 +63,7 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                 role="SDR Especialista Omnichannel", 
                 goal="Criar cadências de prospecção fria de alta conversão.", 
                 backstory="Você é um Closer de elite na Next Tier Up. Você sabe que depender de um só canal é um erro e usa e-mail, LinkedIn e ligações de forma estratégica.", 
-                llm=modelo_gemini,
+                llm=motor_gemini,
                 allow_delegation=False
             )
             
@@ -100,7 +100,6 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                                 st.info("✅ Cadência Omnichannel Gerada:")
                                 st.markdown(resultado.raw)
                             except Exception as erro_ia:
-                                # Captura e exibe o erro exato do Google/LiteLLM
                                 st.error(f"Erro na IA ao processar {lead['empresa']}. Relatório técnico abaixo:")
                                 st.code(str(erro_ia))
                         
