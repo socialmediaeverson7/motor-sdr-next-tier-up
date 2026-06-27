@@ -26,7 +26,8 @@ if st.button("🚀 Iniciar Caçada de Leads"):
         
         try:
             # A GRANDE MUDANÇA: Passar o LLM como um texto simples
-            modelo_gemini = "gemini/gemini-1.5-flash"
+            modelo_gemini = "gemini/gemini-pro"
+
             
             agente_dados = Agent(
                 role="Analista", 
