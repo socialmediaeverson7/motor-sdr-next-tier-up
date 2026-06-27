@@ -36,7 +36,9 @@ def buscar_vencedores_pncp_hoje():
 
 @tool("Consulta Oficial Receita Federal")
 def consulta_receita(cnpj: str) -> str:
+    """Consulta um CNPJ na Receita Federal para descobrir os donos e sócios da empresa."""
     cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
+    
     url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
     resposta = requests.get(url)
     if resposta.status_code == 200:
