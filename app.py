@@ -1,5 +1,11 @@
 import os
-import streamlit as st
+import 
+import os
+# Impede o LangSmith de tentar validar schemas complexos na inicialização
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGSMITH_API_KEY"] = "disabled"
+
+streamlit as st
 from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
 
