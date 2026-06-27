@@ -1,16 +1,26 @@
 import os
+import sys
+import types
+
+# --- O GRANDE TRUQUE CONTRA O STREAMLIT CLOUD ---
+# Injetamos um "módulo fantasma" na memória antes do CrewAI tentar importar.
+if "pkg_resources" not in sys.modules:
+    mock_pkg = types.ModuleType("pkg_resources")
+    mock_pkg.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
+    sys.modules["pkg_resources"] = mock_pkg
+
+# Configurações de segurança contra erros de infraestrutura
+os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGSMITH_API_KEY"] = "disabled"
+
+# Agora sim, importamos o resto normalmente
 import time
 import requests
 from datetime import datetime
 import streamlit as st
 from crewai import Agent, Task, Crew, Process
-
-# AQUI: Importamos o motor oficial do Google que agora será aceito!
 from langchain_google_genai import ChatGoogleGenerativeAI
-
-os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
-os.environ["LANGCHAIN_TRACING_V2"] = "false"
-os.environ["LANGSMITH_API_KEY"] = "disabled"
 
 st.set_page_config(page_title="Motor SDR - Next Tier Up", page_icon="🚀", layout="wide")
 st.title("🎯 Motor SDR Autônomo - Next Tier Up")
@@ -48,7 +58,7 @@ if st.button("🚀 Iniciar Caçada de Leads"):
         os.environ["GEMINI_API_KEY"] = chave_api
         
         try:
-            # Motor nativo ativado: Adeus erro 404!
+            # Motor nativo do Google
             motor_gemini = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
             
             agente_dados = Agent(
