@@ -1,10 +1,7 @@
 import os
 import time
-import requests
-from datetime import datetime
 import streamlit as st
 from crewai import Agent, Task, Crew, Process
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Configurações de segurança contra erros de infraestrutura
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
@@ -22,19 +19,32 @@ if st.button("🚀 Iniciar Caçada de Leads"):
     if not chave_api:
         st.error("⚠️ Insira a sua chave do Gemini na barra lateral.")
     else:
-        # Área de processamento fixa para evitar erros de renderização (removeChild)
         area_processamento = st.container()
         
+        # Guardamos a chave na memória para o CrewAI usar automaticamente
         os.environ["GEMINI_API_KEY"] = chave_api
+        
         try:
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+            # A GRANDE MUDANÇA: Passar o LLM como um texto simples
+            modelo_gemini = "gemini/gemini-1.5-flash"
             
-            agente_dados = Agent(role="Analista", goal="Consultar sócios via CNPJ.", backstory="Expert em dados.", llm=llm)
-            agente_sdr = Agent(role="SDR", goal="Escrever e-mail comercial.", backstory="Closer de elite.", llm=llm)
+            agente_dados = Agent(
+                role="Analista", 
+                goal="Consultar sócios via CNPJ.", 
+                backstory="Expert em dados.", 
+                llm=modelo_gemini
+            )
+            
+            agente_sdr = Agent(
+                role="SDR", 
+                goal="Escrever e-mail comercial.", 
+                backstory="Closer de elite.", 
+                llm=modelo_gemini
+            )
             
             with area_processamento:
                 with st.spinner("Conectando ao PNCP..."):
-                    # Simulação de leads (substitua pela sua função real de busca)
+                    # Simulação de leads (substitua pela sua função real de busca depois)
                     leads = [{"cnpj": "00000000000191", "empresa": "Exemplo LTDA", "objeto": "Serviço de TI"}]
                 
                 if not leads:
@@ -43,7 +53,6 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                     st.success(f"🔥 Encontrados {len(leads)} leads!")
                     
                     for lead in leads:
-                        # Container individual para cada lead, evitando conflitos de interface
                         with st.container():
                             st.write(f"---")
                             st.write(f"**⚙️ Processando:** {lead['empresa']}")
@@ -55,9 +64,8 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                             resultado = crew.kickoff()
                             
                             st.info("E-mail Gerado:")
-                            st.markdown(resultado)
+                            st.markdown(resultado.raw) # .raw extrai o texto final limpo
                         
-                        # Pausa técnica para o navegador renderizar sem erro
                         time.sleep(0.5) 
                         
         except Exception as e:
