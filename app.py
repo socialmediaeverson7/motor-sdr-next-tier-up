@@ -56,7 +56,7 @@ if st.button("🚀 Iniciar Caçada de Leads", use_container_width=True):
         os.environ["GEMINI_API_KEY"] = chave_api
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         
-                        agente_dados = Agent(
+        agente_dados = Agent(
             role="Analista de Dados",
             goal="Consultar o CNPJ na Receita Federal e entregar os sócios.",
             backstory="Você é preciso.",
@@ -73,8 +73,6 @@ if st.button("🚀 Iniciar Caçada de Leads", use_container_width=True):
             llm=llm,
             allow_delegation=False
         )
-        
-        
         
         with st.spinner("Conectando ao Portal do Governo (PNCP)..."):
             leads = buscar_vencedores_pncp_hoje()
@@ -103,4 +101,4 @@ if st.button("🚀 Iniciar Caçada de Leads", use_container_width=True):
                 
             st.balloons()
             st.success("✅ Prospecção Finalizada!")
-          
+            
