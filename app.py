@@ -1,17 +1,15 @@
 import os
-import 
-import os
-# Impede o LangSmith de tentar validar schemas complexos na inicialização
-os.environ["LANGCHAIN_TRACING_V2"] = "false"
-os.environ["LANGSMITH_API_KEY"] = "disabled"
-
-streamlit as st
+import requests
+import time
+from datetime import datetime
+import streamlit as st
 from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Configuração simples para evitar erros de inicialização
-st.set_page_config(page_title="Motor SDR", layout="wide")
+# Desativa rastreamento pesado que causa erros
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
 
+st.set_page_config(page_title="Motor SDR", layout="wide")
 st.title("🎯 Motor SDR Autônomo")
 
 with st.sidebar:
@@ -25,7 +23,6 @@ if st.button("🚀 Iniciar"):
             os.environ["GEMINI_API_KEY"] = chave_api
             llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
             
-            # Inicialização mínima para evitar ValidationError
             agente_dados = Agent(
                 role="Analista",
                 goal="Analisar dados.",
@@ -33,7 +30,7 @@ if st.button("🚀 Iniciar"):
                 llm=llm
             )
             
-            st.success("Agente inicializado com sucesso!")
+            st.success("Motor Online!")
             
         except Exception as e:
-            st.error(f"Erro ao inicializar: {e}")
+            st.error(f"Erro: {e}")
