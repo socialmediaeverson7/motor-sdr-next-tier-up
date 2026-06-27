@@ -1,5 +1,7 @@
 import os
 import time
+import requests
+from datetime import datetime
 import streamlit as st
 from crewai import Agent, Task, Crew, Process
 
@@ -15,59 +17,92 @@ with st.sidebar:
     st.header("⚙️ Configurações")
     chave_api = st.text_input("Cole sua Chave do Gemini:", type="password")
 
+# --- FUNÇÃO REAL: Busca de contratos vencidos hoje no Portal Nacional ---
+def buscar_vencedores_pncp_hoje():
+    hoje = datetime.now().strftime("%Y%m%d")
+    url = f"https://pncp.gov.br/api/consulta/v1/contratos?dataInicial={hoje}&dataFinal={hoje}&pagina=1"
+    headers = {'accept': 'application/json'}
+    try:
+        resposta = requests.get(url, headers=headers, timeout=15)
+        lista_cnpjs = []
+        if resposta.status_code == 200:
+            dados = resposta.json()
+            # Pegamos os 3 primeiros contratos do dia para não sobrecarregar
+            for contrato in dados.get('data', [])[:3]: 
+                cnpj = contrato.get('niFornecedor')
+                nome_empresa = contrato.get('nomeRazaoSocialFornecedor')
+                objeto = contrato.get('objetoContrato', 'Serviços/Obras')
+                if cnpj and len(str(cnpj)) == 14:
+                    lista_cnpjs.append({"cnpj": cnpj, "empresa": nome_empresa, "objeto": objeto})
+            return lista_cnpjs
+        return []
+    except Exception:
+        return []
+
 if st.button("🚀 Iniciar Caçada de Leads"):
     if not chave_api:
         st.error("⚠️ Insira a sua chave do Gemini na barra lateral.")
     else:
         area_processamento = st.container()
         
-        # Guardamos a chave na memória para o CrewAI usar automaticamente
+        # A chave de API no ambiente para o CrewAI encontrar automaticamente
         os.environ["GEMINI_API_KEY"] = chave_api
         
         try:
-            # A GRANDE MUDANÇA: Passar o LLM como um texto simples
-            modelo_gemini = "gemini/gemini-pro"
-
+            # O nome exato e atualizado do modelo exigido pelo Google
+            modelo_gemini = "gemini/gemini-1.5-flash"
             
             agente_dados = Agent(
                 role="Analista", 
-                goal="Consultar sócios via CNPJ.", 
-                backstory="Expert em dados.", 
-                llm=modelo_gemini
+                goal="Analisar a empresa que ganhou a licitação e traçar um perfil.", 
+                backstory="Você é um expert em inteligência de mercado.", 
+                llm=modelo_gemini,
+                allow_delegation=False
             )
             
             agente_sdr = Agent(
                 role="SDR", 
-                goal="Escrever e-mail comercial.", 
-                backstory="Closer de elite.", 
-                llm=modelo_gemini
+                goal="Escrever e-mails de prospecção fria baseados no contrato ganho.", 
+                backstory="Você é um Closer de elite na Next Tier Up focado em B2B.", 
+                llm=modelo_gemini,
+                allow_delegation=False
             )
             
             with area_processamento:
-                with st.spinner("Conectando ao PNCP..."):
-                    # Simulação de leads (substitua pela sua função real de busca depois)
-                    leads = [{"cnpj": "00000000000191", "empresa": "Exemplo LTDA", "objeto": "Serviço de TI"}]
+                with st.spinner("Buscando empresas reais no PNCP..."):
+                    # Agora chamamos a função real em vez da lista falsa!
+                    leads = buscar_vencedores_pncp_hoje()
                 
                 if not leads:
-                    st.warning("Nenhum contrato novo encontrado hoje.")
+                    st.warning("Nenhum contrato novo encontrado hoje (ou a API do Governo está lenta). Tente em alguns minutos.")
                 else:
-                    st.success(f"🔥 Encontrados {len(leads)} leads!")
+                    st.success(f"🔥 Encontrados {len(leads)} leads quentes reais!")
                     
                     for lead in leads:
                         with st.container():
                             st.write(f"---")
-                            st.write(f"**⚙️ Processando:** {lead['empresa']}")
+                            st.write(f"**🏢 Empresa:** {lead['empresa']} (CNPJ: {lead['cnpj']})")
+                            st.write(f"**📜 Contrato ganho:** {lead['objeto'][:100]}...")
                             
-                            t1 = Task(description=f"Consultar {lead['cnpj']}", expected_output="Sócios", agent=agente_dados)
-                            t2 = Task(description=f"Escrever e-mail sobre {lead['objeto']}", expected_output="E-mail", agent=agente_sdr)
+                            t1 = Task(
+                                description=f"Analise a vitória da empresa {lead['empresa']} (CNPJ: {lead['cnpj']}) que acaba de ganhar um contrato público para: '{lead['objeto']}'. Descreva brevemente o perfil provável do tomador de decisão (CEO/Diretor) desta empresa.",
+                                expected_output="Perfil executivo da empresa.",
+                                agent=agente_dados
+                            )
+                            t2 = Task(
+                                description=f"Com base no perfil, escreva um e-mail de prospecção B2B persuasivo para o dono da {lead['empresa']}. Parabenize-o pelo contrato de '{lead['objeto']}' e ofereça os serviços de escala da Next Tier Up. Seja direto e não use jargões complexos.",
+                                expected_output="E-mail B2B pronto.",
+                                agent=agente_sdr
+                            )
                             
                             crew = Crew(agents=[agente_dados, agente_sdr], tasks=[t1, t2], process=Process.sequential)
                             resultado = crew.kickoff()
                             
-                            st.info("E-mail Gerado:")
-                            st.markdown(resultado.raw) # .raw extrai o texto final limpo
+                            st.info("E-mail Gerado com Sucesso:")
+                            st.markdown(resultado.raw)
                         
-                        time.sleep(0.5) 
+                        # Pausa para estabilizar o navegador no celular
+                        time.sleep(1) 
                         
         except Exception as e:
             st.error(f"Erro no sistema: {e}")
