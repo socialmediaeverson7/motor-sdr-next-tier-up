@@ -1,3 +1,11 @@
+import sys
+# Garante que o setuptools esteja acessível se o CrewAI precisar
+try:
+    import pkg_resources
+except ImportError:
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "setuptools"])
+    import pkg_resources
 import os
 import streamlit as st
 from crewai import Agent, Task, Crew, Process
