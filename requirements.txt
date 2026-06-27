@@ -1,4 +1,6 @@
 streamlit
-crewai
+crewai==0.30.11
 langchain-google-genai
+pydantic==2.5.2
 requests
+
