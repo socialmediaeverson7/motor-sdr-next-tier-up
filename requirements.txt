@@ -4,3 +4,4 @@ langchain-google-genai==1.0.3
 langchain-core==0.1.45
 pydantic==2.5.2
 requests
+setuptools
