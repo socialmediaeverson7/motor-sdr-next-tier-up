@@ -1,31 +1,64 @@
 import os
-# Desativar telemetria ANTES de qualquer import do crewai
+import time
+import requests
+from datetime import datetime
+import streamlit as st
+from crewai import Agent, Task, Crew, Process
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# Configurações de segurança contra erros de infraestrutura
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGSMITH_API_KEY"] = "disabled"
 
-import streamlit as st
-from langchain_google_genai import ChatGoogleGenerativeAI
-# Importamos apenas o essencial
-from crewai import Agent, Task, Crew, Process
-
-st.set_page_config(page_title="Motor SDR", layout="wide")
-st.title("🎯 Motor SDR Autônomo")
+st.set_page_config(page_title="Motor SDR - Next Tier Up", page_icon="🚀", layout="wide")
+st.title("🎯 Motor SDR Autônomo - Next Tier Up")
 
 with st.sidebar:
+    st.header("⚙️ Configurações")
     chave_api = st.text_input("Cole sua Chave do Gemini:", type="password")
 
-if st.button("🚀 Iniciar"):
+if st.button("🚀 Iniciar Caçada de Leads"):
     if not chave_api:
-        st.error("Insira a chave API.")
+        st.error("⚠️ Insira a sua chave do Gemini na barra lateral.")
     else:
-        os.environ["GEMINI_API_KEY"] = chave_api
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+        # Área de processamento fixa para evitar erros de renderização (removeChild)
+        area_processamento = st.container()
         
-        # Agente simples
-        agente = Agent(
-            role="Analista",
-            goal="Processar dados.",
-            backstory="Especialista.",
-            llm=llm
-        )
-        st.success("Motor Rodando!")
+        os.environ["GEMINI_API_KEY"] = chave_api
+        try:
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+            
+            agente_dados = Agent(role="Analista", goal="Consultar sócios via CNPJ.", backstory="Expert em dados.", llm=llm)
+            agente_sdr = Agent(role="SDR", goal="Escrever e-mail comercial.", backstory="Closer de elite.", llm=llm)
+            
+            with area_processamento:
+                with st.spinner("Conectando ao PNCP..."):
+                    # Simulação de leads (substitua pela sua função real de busca)
+                    leads = [{"cnpj": "00000000000191", "empresa": "Exemplo LTDA", "objeto": "Serviço de TI"}]
+                
+                if not leads:
+                    st.warning("Nenhum contrato novo encontrado hoje.")
+                else:
+                    st.success(f"🔥 Encontrados {len(leads)} leads!")
+                    
+                    for lead in leads:
+                        # Container individual para cada lead, evitando conflitos de interface
+                        with st.container():
+                            st.write(f"---")
+                            st.write(f"**⚙️ Processando:** {lead['empresa']}")
+                            
+                            t1 = Task(description=f"Consultar {lead['cnpj']}", expected_output="Sócios", agent=agente_dados)
+                            t2 = Task(description=f"Escrever e-mail sobre {lead['objeto']}", expected_output="E-mail", agent=agente_sdr)
+                            
+                            crew = Crew(agents=[agente_dados, agente_sdr], tasks=[t1, t2], process=Process.sequential)
+                            resultado = crew.kickoff()
+                            
+                            st.info("E-mail Gerado:")
+                            st.markdown(resultado)
+                        
+                        # Pausa técnica para o navegador renderizar sem erro
+                        time.sleep(0.5) 
+                        
+        except Exception as e:
+            st.error(f"Erro no sistema: {e}")
