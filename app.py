@@ -49,8 +49,8 @@ if st.button("🚀 Iniciar Caçada de Leads"):
         os.environ["GEMINI_API_KEY"] = chave_api
         
         try:
-            # O nome exato e atualizado do modelo exigido pelo Google
-            modelo_gemini = "gemini/gemini-1.5-flash"
+            # O NOME CORRETO EXIGIDO PELO GOOGLE NESTA VERSÃO
+            modelo_gemini = "gemini/gemini-1.5-flash-latest"
             
             agente_dados = Agent(
                 role="Analista", 
@@ -70,7 +70,6 @@ if st.button("🚀 Iniciar Caçada de Leads"):
             
             with area_processamento:
                 with st.spinner("Buscando empresas reais no PNCP..."):
-                    # Agora chamamos a função real em vez da lista falsa!
                     leads = buscar_vencedores_pncp_hoje()
                 
                 if not leads:
@@ -96,13 +95,17 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                             )
                             
                             crew = Crew(agents=[agente_dados, agente_sdr], tasks=[t1, t2], process=Process.sequential)
-                            resultado = crew.kickoff()
                             
-                            st.info("E-mail Gerado com Sucesso:")
-                            st.markdown(resultado.raw)
+                            # Tratamento de erro INDIVIDUAL (se uma empresa falhar, ele pula para a próxima)
+                            try:
+                                resultado = crew.kickoff()
+                                st.info("E-mail Gerado com Sucesso:")
+                                st.markdown(resultado.raw)
+                            except Exception as erro_ia:
+                                st.error(f"Erro ao gerar e-mail para {lead['empresa']}: A IA não conseguiu processar. Tentando o próximo...")
                         
                         # Pausa para estabilizar o navegador no celular
                         time.sleep(1) 
                         
         except Exception as e:
-            st.error(f"Erro no sistema: {e}")
+            st.error(f"Erro fatal no sistema: {e}")
