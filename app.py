@@ -55,37 +55,45 @@ def bot_pncp():
                         "sinal": "Vitória em Licitação Pública"
                     })
         return leads
-    except: return []
+    except Exception as e:
+        st.error(f"⚠️ Erro no Bot do PNCP: {e}")
+        return []
 
 def bot_osint_linkedin():
-    # Usa Google Dorks via DuckDuckGo para achar perfis no LinkedIn
     dork = 'site:br.linkedin.com/in "CEO" OR "Diretor" "Uberlândia"'
     leads = []
     try:
-        resultados = DDGS().text(dork, max_results=3)
-        for r in resultados:
-            leads.append({
-                "alvo": r.get('title', '').split('-')[0].strip(),
-                "contexto": f"Resumo do perfil: {r.get('body', '')} | Link: {r.get('href', '')}",
-                "sinal": "Mudança de cargo recente ou perfil ativo"
-            })
+        with DDGS() as ddgs:
+            resultados = ddgs.text(dork, max_results=3)
+            for r in resultados:
+                leads.append({
+                    "alvo": r.get('title', '').split('-')[0].strip(),
+                    "contexto": f"Resumo do perfil: {r.get('body', '')} | Link: {r.get('href', '')}",
+                    "sinal": "Mudança de cargo recente ou perfil ativo"
+                })
         return leads
-    except: return []
+    except Exception as e:
+        # AQUI O ERRO REAL SERÁ EXPOSTO
+        st.error(f"⚠️ Bloqueio no Radar LinkedIn (DDGS): {e}")
+        return []
 
 def bot_sniper_local():
-    # Busca empresas locais diretas
     termo_busca = 'Clínicas de Estética em Uberlândia'
     leads = []
     try:
-        resultados = DDGS().text(termo_busca, max_results=3)
-        for r in resultados:
-            leads.append({
-                "alvo": r.get('title', ''),
-                "contexto": f"Descrição encontrada na web: {r.get('body', '')} | Site: {r.get('href', '')}",
-                "sinal": "Negócio local ativo com presença digital"
-            })
+        with DDGS() as ddgs:
+            resultados = ddgs.text(termo_busca, max_results=3)
+            for r in resultados:
+                leads.append({
+                    "alvo": r.get('title', ''),
+                    "contexto": f"Descrição web: {r.get('body', '')} | Site: {r.get('href', '')}",
+                    "sinal": "Negócio local ativo com presença digital"
+                })
         return leads
-    except: return []
+    except Exception as e:
+        # AQUI O ERRO REAL SERÁ EXPOSTO
+        st.error(f"⚠️ Bloqueio no Sniper Local (DDGS): {e}")
+        return []
 
 # --- MOTOR PRINCIPAL ---
 
@@ -125,7 +133,7 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                         leads = bot_sniper_local()
                 
                 if not leads:
-                    st.warning("O bot não conseguiu extrair dados no momento. Tente novamente.")
+                    st.warning("O bot não conseguiu extrair dados no momento. Verifique os erros acima.")
                 else:
                     st.success(f"🔥 Sistema interceptou {len(leads)} alvos na web!")
                     
