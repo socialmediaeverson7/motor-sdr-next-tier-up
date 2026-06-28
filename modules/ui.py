@@ -25,7 +25,7 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
     """
     with st.sidebar:
         st.header("⚙️ Chave de IA")
-        api_key = st.text_input("Cole sua Chave do Gemini:", type="password")
+        api_key = st.text_input("Cole sua Chave do Gemini:", type="password", help="Obtenha sua chave em: https://aistudio.google.com/app/apikey")
         
         st.header("✉️ Credenciais de Disparo (Canal 1)")
         sender_email = st.text_input("Seu E-mail (Gmail/Workspace):", placeholder="seuemail@gmail.com")

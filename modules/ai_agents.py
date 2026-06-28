@@ -36,10 +36,17 @@ class AIAgentManager:
             raise AIAgentError("Chave de API do Gemini não fornecida")
         
         try:
-            os.environ["GOOGLE_API_KEY"] = api_key
+            # Limpar espaços em branco extras que podem causar erro 400
+            clean_api_key = api_key.strip()
+            
+            # Configurar variável de ambiente para garantir compatibilidade com bibliotecas que a utilizam
+            os.environ["GOOGLE_API_KEY"] = clean_api_key
+            
+            # Inicializar o modelo passando a chave explicitamente para evitar dependência apenas de env vars
             self.llm = ChatGoogleGenerativeAI(
                 model=DEFAULT_LLM_MODEL,
-                temperature=LLM_TEMPERATURE
+                temperature=LLM_TEMPERATURE,
+                google_api_key=clean_api_key  # Passagem explícita da chave
             )
         except Exception as e:
             raise AIAgentError(f"Erro ao inicializar modelo de IA: {e}")
@@ -198,6 +205,10 @@ def validate_and_initialize_ai(api_key: str) -> Optional[AIAgentManager]:
         if not api_key or not api_key.strip():
             st.error(MESSAGES["error_api_key"])
             return None
+        
+        # Teste rápido de conectividade (opcional, mas útil para feedback imediato)
+        # manager = AIAgentManager(api_key)
+        # return manager
         
         return AIAgentManager(api_key)
         
