@@ -12,15 +12,12 @@ class AIAgentError(Exception):
 class AIAgentManager:
     def __init__(self, api_key: str):
         if not api_key or not api_key.strip():
-            raise AIAgentError("Chave de API do Gemini não fornecida")
-        
-        # Vamos apenas armazenar a configuração aqui, não o objeto LLM diretamente
-        # Isso evita o conflito de validação Pydantic no __init__
+            raise AIAgentError("Chave de API não fornecida")
         self.api_key = api_key.strip()
         os.environ["GOOGLE_API_KEY"] = self.api_key
 
+    # Criamos o objeto LLM internamente apenas quando necessário
     def _get_llm(self):
-        """Inicializa o LLM sob demanda para evitar erros de validação Pydantic"""
         return ChatGoogleGenerativeAI(
             model=DEFAULT_LLM_MODEL,
             temperature=LLM_TEMPERATURE,
@@ -29,14 +26,12 @@ class AIAgentManager:
     
     def create_data_analyst_agent(self) -> Agent:
         config = AGENT_PROMPTS["data_analyst"]
-        scrape_tool = ScrapeWebsiteTool()
-        
         return Agent(
             role=config["role"],
             goal=config["goal"],
             backstory=config["backstory"],
-            llm=self._get_llm(), # Inicializado aqui, no momento da criação
-            tools=[scrape_tool],
+            llm=self._get_llm(),
+            tools=[ScrapeWebsiteTool()],
             allow_delegation=False,
             verbose=True
         )
@@ -47,20 +42,21 @@ class AIAgentManager:
             role=config["role"],
             goal=config["goal"],
             backstory=config["backstory"],
-            llm=self._get_llm(), # Inicializado aqui
+            llm=self._get_llm(),
             allow_delegation=False,
             verbose=True
         )
 
-    # ... (o restante dos métodos permanece igual)
+    # (Métodos de Task e Crew permanecem os mesmos)
     def create_analysis_task(self, agent: Agent, batch_text: str) -> Task:
         template = TASK_TEMPLATES["analysis"]
-        description = template["description"].format(batch_text=batch_text)
-        return Task(description=description, expected_output=template["expected_output"], agent=agent)
+        return Task(description=template["description"].format(batch_text=batch_text), 
+                    expected_output=template["expected_output"], agent=agent)
     
     def create_cadence_task(self, agent: Agent) -> Task:
         template = TASK_TEMPLATES["cadence"]
-        return Task(description=template["description"], expected_output=template["expected_output"], agent=agent)
+        return Task(description=template["description"], 
+                    expected_output=template["expected_output"], agent=agent)
     
     def execute_crew(self, agents: List[Agent], tasks: List[Task]) -> str:
         crew = Crew(agents=agents, tasks=tasks, process=Process.sequential, verbose=True)
