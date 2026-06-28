@@ -3,6 +3,9 @@ import types
 import os
 import time
 import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import streamlit as st
 
@@ -15,7 +18,7 @@ if "pkg_resources" not in sys.modules:
     mock_pkg.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
     sys.modules["pkg_resources"] = mock_pkg
 
-# 3. SEGURANÇA CONTRA RASTREAMENTO
+# 3. SEGURANÇA
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGSMITH_API_KEY"] = "disabled"
@@ -27,8 +30,12 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 st.title("🎯 Motor SDR Autônomo - Next Tier Up")
 
 with st.sidebar:
-    st.header("⚙️ Configurações")
+    st.header("⚙️ Chave de IA")
     chave_api = st.text_input("Cole sua Chave do Gemini:", type="password")
+    
+    st.header("✉️ Credenciais de Disparo (Canal 1)")
+    remetente_email = st.text_input("Seu E-mail (Gmail/Workspace):", placeholder="seuemail@gmail.com")
+    remetente_senha = st.text_input("Senha de App (Google):", type="password", help="Use uma 'Senha de App' gerada na segurança do Google, não sua senha normal.")
     
     st.header("🔎 Arsenal de Prospecção")
     estrategia = st.radio(
@@ -40,19 +47,15 @@ with st.sidebar:
         ]
     )
     
-    # Controles Dinâmicos baseados na escolha
     termo_busca = ""
     cnpj_alvo = ""
     
     if estrategia == "2. Sniper B2B de Nicho (Automático)":
-        st.markdown("O robô vai rastrear empresas ativas por geolocalização.")
         termo_busca = st.text_input("Qual nicho e região?", value="Transportadora em Uberlândia")
-        
     elif estrategia == "3. Raio-X de CNPJ (Manual)":
-        st.markdown("Enriquecimento profundo para um alvo específico.")
         cnpj_alvo = st.text_input("Digite o CNPJ (somente números):")
 
-# --- BOTS DE EXTRAÇÃO (100% REST APIs Blindadas) ---
+# --- BOTS DE EXTRAÇÃO ---
 
 def bot_pncp():
     hoje = datetime.now().strftime("%Y%m%d")
@@ -61,7 +64,7 @@ def bot_pncp():
         resposta = requests.get(url, headers={'accept': 'application/json'}, timeout=15)
         leads = []
         if resposta.status_code == 200:
-            for c in resposta.json().get('data', [])[:3]:
+            for c in resposta.json().get('data', [])[:10]: # Acelerador em 10!
                 if c.get('niFornecedor'):
                     leads.append({
                         "alvo": c.get('nomeRazaoSocialFornecedor'),
@@ -74,78 +77,53 @@ def bot_pncp():
         return []
 
 def bot_sniper_nicho(termo):
-    # API Imune a bloqueios de nuvem que pesquisa empresas reais no mapa
     url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": termo,
-        "format": "json",
-        "limit": 3,
-        "addressdetails": 1
-    }
+    params = {"q": termo, "format": "json", "limit": 10, "addressdetails": 1}
     headers = {"User-Agent": "MotorSDR_NextTierUp_Bot/2.0"}
-    
     try:
         resposta = requests.get(url, params=params, headers=headers, timeout=10)
         leads = []
         if resposta.status_code == 200:
             dados = resposta.json()
             for r in dados:
-                nome_fantasia = r.get('display_name', '').split(',')[0]
-                endereco_completo = r.get('display_name', '')
                 leads.append({
-                    "alvo": nome_fantasia,
-                    "contexto": f"Empresa localizada via satélite no endereço: {endereco_completo}",
-                    "sinal": f"Operação comercial ativa confirmada para o nicho alvo."
+                    "alvo": r.get('display_name', '').split(',')[0],
+                    "contexto": f"Endereço: {r.get('display_name', '')}",
+                    "sinal": f"Operação comercial ativa confirmada."
                 })
         return leads
     except Exception as e:
-        st.error(f"⚠️ Erro no rastreamento de mapa: {e}")
+        st.error(f"⚠️ Erro no mapa: {e}")
         return []
 
 def bot_osint_receita(cnpj):
     cnpj_limpo = ''.join(filter(str.isdigit, cnpj))
-    if len(cnpj_limpo) != 14:
-        return []
-        
+    if len(cnpj_limpo) != 14: return []
     url = f"https://receitaws.com.br/v1/cnpj/{cnpj_limpo}"
     try:
         resposta = requests.get(url, timeout=15)
         leads = []
         if resposta.status_code == 200:
             dados = resposta.json()
-            if dados.get("status") == "ERROR":
-                st.warning(f"⚠️ {dados.get('message')}")
-                return []
-                
+            if dados.get("status") == "ERROR": return []
             socios = [s.get('nome') for s in dados.get('qsa', [])]
-            socios_str = ", ".join(socios) if socios else "Não listado"
-            
             leads.append({
                 "alvo": dados.get('nome'),
-                "contexto": f"Abertura: {dados.get('abertura')}. Capital Social: R$ {dados.get('capital_social')}. Atividade: {dados.get('atividade_principal', [{}])[0].get('text', '')}. Sócios: {socios_str}.",
-                "sinal": "Análise Estratégica Baseada em Maturidade e Estrutura Societária"
+                "contexto": f"Capital: R$ {dados.get('capital_social')}. Atividade: {dados.get('atividade_principal', [{}])[0].get('text', '')}. Sócios: {', '.join(socios)}",
+                "sinal": "Análise Estratégica Societária"
             })
-        elif resposta.status_code == 429:
-            st.warning("⚠️ Limite de consultas da ReceitaWS atingido. Tente em 1 minuto.")
         return leads
     except Exception as e:
-        st.error(f"⚠️ Erro na consulta de CNPJ: {e}")
+        st.error(f"⚠️ Erro CNPJ: {e}")
         return []
 
-# --- MOTOR PRINCIPAL ---
+# --- MOTOR PRINCIPAL E EXECUÇÃO ---
 
-if st.button("🚀 Iniciar Caçada de Leads"):
-    # Validações de entrada
+if st.button("🚀 Iniciar Caçada e Gerar Cadências"):
     if not chave_api:
-        st.error("⚠️ Insira a sua chave do Gemini na barra lateral.")
+        st.error("⚠️ Insira a chave do Gemini.")
         st.stop()
-    if estrategia == "2. Sniper B2B de Nicho (Automático)" and not termo_busca:
-        st.error("⚠️ Digite um nicho e região para o Sniper caçar.")
-        st.stop()
-    if estrategia == "3. Raio-X de CNPJ (Manual)" and not cnpj_alvo:
-        st.error("⚠️ Digite um CNPJ válido para prosseguir.")
-        st.stop()
-
+        
     area_processamento = st.container()
     os.environ["GOOGLE_API_KEY"] = chave_api
     
@@ -153,62 +131,81 @@ if st.button("🚀 Iniciar Caçada de Leads"):
         motor_gemini = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         
         agente_dados = Agent(
-            role="Analista de Inteligência Operacional", 
-            goal="Analisar a empresa alvo e descobrir as principais dores do seu setor.", 
-            backstory="Expert em inteligência de mercado B2B. Você deduz os gargalos comerciais da empresa com base no seu nicho e localização.", 
-            llm=motor_gemini,
-            allow_delegation=False
+            role="Analista de Inteligência", 
+            goal="Analisar a empresa alvo.", 
+            backstory="Expert B2B que acha dores operacionais.", 
+            llm=motor_gemini, allow_delegation=False
         )
         
         agente_sdr = Agent(
-            role="SDR Especialista Omnichannel", 
-            goal="Criar cadências de prospecção fria de altíssima conversão.", 
-            backstory="Closer de elite. Você usa os dados levantados para criar uma abordagem hiper-personalizada que chama a atenção do decisor.", 
-            llm=motor_gemini,
-            allow_delegation=False
+            role="SDR", 
+            goal="Escrever e-mail curto e agressivo focado em conversão.", 
+            backstory="Closer de elite focado em Receita Previsível.", 
+            llm=motor_gemini, allow_delegation=False
         )
         
         with area_processamento:
-            with st.spinner(f"Executando operação: {estrategia}..."):
-                if estrategia == "1. Radar de Licitações (Automático)":
-                    leads = bot_pncp()
-                elif estrategia == "2. Sniper B2B de Nicho (Automático)":
-                    leads = bot_sniper_nicho(termo_busca)
-                else:
-                    leads = bot_osint_receita(cnpj_alvo)
+            with st.spinner("Extraindo alvos..."):
+                if estrategia == "1. Radar de Licitações (Automático)": leads = bot_pncp()
+                elif estrategia == "2. Sniper B2B de Nicho (Automático)": leads = bot_sniper_nicho(termo_busca)
+                else: leads = bot_osint_receita(cnpj_alvo)
             
             if not leads:
-                st.warning("O robô não encontrou resultados para esses parâmetros.")
+                st.warning("Nenhum alvo encontrado.")
             else:
-                st.success(f"🔥 Sistema interceptou {len(leads)} alvos com sucesso!")
+                st.success(f"🔥 {len(leads)} alvos interceptados! Iniciando IA...")
                 
-                for lead in leads:
-                    with st.container():
-                        st.write(f"---")
-                        st.write(f"**🎯 Alvo:** {lead['alvo']}")
-                        st.write(f"**📡 Dados Coletados:** {lead['contexto']}")
+                for idx, lead in enumerate(leads):
+                    with st.expander(f"🎯 Alvo: {lead['alvo']}", expanded=True):
+                        st.write(f"**Sinal:** {lead['contexto']}")
                         
-                        t1 = Task(
-                            description=f"Analise o alvo: {lead['alvo']}. Contexto: '{lead['contexto']}'. Descreva as dores operacionais e comerciais que uma empresa com essas características enfrenta hoje.",
-                            expected_output="Análise do perfil da empresa e principais gargalos comerciais.",
-                            agent=agente_dados
-                        )
-                        t2 = Task(
-                            description=f"Com base na análise, crie uma cadência de prospecção B2B de 3 passos para a Next Tier Up fechar negócio com {lead['alvo']}:\n1) E-mail Frio.\n2) Mensagem de LinkedIn.\n3) Script de Cold Call de 30s.",
-                            expected_output="Cadência estruturada contendo E-mail, Mensagem de LinkedIn e Script de Ligação.",
-                            agent=agente_sdr
-                        )
+                        t1 = Task(description=f"Analise: {lead['alvo']}. Contexto: {lead['contexto']}.", expected_output="Dor mapeada.", agent=agente_dados)
+                        t2 = Task(description=f"Crie um E-mail de Prospecção Fria para a Next Tier Up fechar com {lead['alvo']}. Apenas o texto do e-mail.", expected_output="Texto do E-mail.", agent=agente_sdr)
                         
                         crew = Crew(agents=[agente_dados, agente_sdr], tasks=[t1, t2], process=Process.sequential)
                         
                         try:
-                            resultado = crew.kickoff()
-                            st.info("✅ Material de Abordagem Gerado:")
-                            st.markdown(resultado.raw)
+                            # Converte o objeto da IA garantindo que seja string!
+                            copy_gerada = str(crew.kickoff())
+                            
+                            # PAINEL OMNICHANNEL
+                            aba_email, aba_linkedin = st.tabs(["✉️ Disparador (Canal 1)", "💼 Próximos Canais"])
+                            
+                            with aba_email:
+                                dest = st.text_input("E-mail do Lead:", key=f"dest_{idx}")
+                                assunto = st.text_input("Assunto do E-mail:", value=f"Estratégia para {lead['alvo']}", key=f"ass_{idx}")
+                                corpo_email = st.text_area("Edite a Copy Gerada:", value=copy_gerada, height=250, key=f"copy_{idx}")
+                                
+                                if st.button("🚀 Disparar E-mail Frio", key=f"btn_{idx}"):
+                                    if not remetente_email or not remetente_senha:
+                                        st.error("Preencha seu E-mail e Senha de App na barra lateral!")
+                                    elif not dest:
+                                        st.error("Preencha o e-mail de destino.")
+                                    else:
+                                        try:
+                                            # Construindo o pacote do E-mail
+                                            msg = MIMEMultipart()
+                                            msg['From'] = remetente_email
+                                            msg['To'] = dest
+                                            msg['Subject'] = assunto
+                                            msg.attach(MIMEText(corpo_email, 'plain'))
+                                            
+                                            # Conectando no servidor do Google e disparando
+                                            server = smtplib.SMTP('smtp.gmail.com', 587)
+                                            server.starttls()
+                                            server.login(remetente_email, remetente_senha)
+                                            server.send_message(msg)
+                                            server.quit()
+                                            st.success(f"Vitória! E-mail disparado para {dest} 🎯")
+                                        except Exception as err:
+                                            st.error(f"Erro no servidor SMTP: {err}")
+                                            
+                            with aba_linkedin:
+                                st.info("Em breve: Botões de conexão direta para o LinkedIn e Scripts de Ligação.")
+                                
                         except Exception as erro_ia:
-                            st.error(f"Erro na IA. Log técnico:")
-                            st.code(str(erro_ia))
-                    time.sleep(1) 
+                            st.error(f"Erro na IA: {erro_ia}")
+                    time.sleep(1)
                     
     except Exception as e:
         st.error(f"Erro crítico no motor de IA: {e}")
