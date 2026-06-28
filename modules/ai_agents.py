@@ -1,3 +1,4 @@
+from crewai_tools import ScrapeWebsiteTool
 """
 Módulo de Agentes de IA
 Implementa os agentes CrewAI para análise e geração de cadências
