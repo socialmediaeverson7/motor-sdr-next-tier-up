@@ -47,6 +47,9 @@ if "processing" not in st.session_state:
 if "last_results" not in st.session_state:
     st.session_state.last_results = None
 
+if "processed_targets" not in st.session_state:
+    st.session_state.processed_targets = set()
+
 # ============================================================================
 # RENDERIZAÇÃO DA INTERFACE
 # ============================================================================
@@ -90,6 +93,9 @@ if st.session_state.processing:
                 leads = get_leads_by_strategy(strategy_key, cnpj=cnpj_target)
             else:
                 leads = get_leads_by_strategy(strategy_key)
+            
+            # Filtrar alvos já processados
+            leads = [l for l in leads if l['alvo'] not in st.session_state.processed_targets]
         
         # Validar se há leads
         if not leads:
@@ -111,6 +117,9 @@ if st.session_state.processing:
         # Renderizar resultados
         if results:
             ui.render_results(results)
+            # Adicionar alvos ao histórico de processados
+            for lead in leads:
+                st.session_state.processed_targets.add(lead['alvo'])
         
         st.session_state.processing = False
         

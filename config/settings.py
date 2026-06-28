@@ -29,13 +29,13 @@ STREAMLIT_CONFIG = {
 
 API_TIMEOUT = 15  # segundos
 API_RETRY_ATTEMPTS = 3
-MAX_LEADS_PER_REQUEST = 10
+MAX_LEADS_PER_REQUEST = 1
 
 # ============================================================================
 # CONFIGURAÇÕES DE MODELOS DE IA
 # ============================================================================
 
-DEFAULT_LLM_MODEL = "gemini-1.5-flash"
+DEFAULT_LLM_MODEL = "gemini-1.5-pro"
 LLM_TEMPERATURE = 0.7
 
 # ============================================================================
