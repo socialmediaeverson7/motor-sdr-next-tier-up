@@ -7,3 +7,4 @@ requests>=2.31.0
 duckduckgo-search>=3.9.0
 setuptools>=68.0.0
 python-dotenv>=1.0.0
+crewai-tools
