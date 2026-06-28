@@ -65,7 +65,7 @@ class AIAgentManager:
             backstory=config["backstory"],
             llm=self.llm,
             allow_delegation=False,
-            verbose=False
+            verbose=True
         )
     
     def create_sdr_agent(self) -> Agent:
@@ -82,7 +82,7 @@ class AIAgentManager:
             backstory=config["backstory"],
             llm=self.llm,
             allow_delegation=False,
-            verbose=False
+            verbose=True
         )
     
     def create_analysis_task(self, agent: Agent, batch_text: str) -> Task:
@@ -142,7 +142,7 @@ class AIAgentManager:
                 agents=agents,
                 tasks=tasks,
                 process=Process.sequential,
-                verbose=False
+                verbose=True
             )
             
             result = crew.kickoff()

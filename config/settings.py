@@ -35,7 +35,7 @@ MAX_LEADS_PER_REQUEST = 1
 # CONFIGURAÇÕES DE MODELOS DE IA
 # ============================================================================
 
-DEFAULT_LLM_MODEL = "gemini-1.5-pro"
+DEFAULT_LLM_MODEL = "gemini-1.5-flash"
 LLM_TEMPERATURE = 0.7
 
 # ============================================================================
