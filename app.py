@@ -1,18 +1,26 @@
+import sys
+import types
 import os
 import time
 import requests
 from datetime import datetime
 import streamlit as st
 
-# 1. A REGRA DE OURO DO STREAMLIT: A interface carrega primeiro!
+# 1. A REGRA DE OURO DO STREAMLIT: A interface gráfica SEMPRE primeiro!
 st.set_page_config(page_title="Motor SDR - Next Tier Up", page_icon="🎯", layout="wide")
 
-# 2. Desligar telemetria ANTES de carregar a IA
+# 2. O MÓDULO FANTASMA: Injetamos o bypass na memória antes do CrewAI acordar
+if "pkg_resources" not in sys.modules:
+    mock_pkg = types.ModuleType("pkg_resources")
+    mock_pkg.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
+    sys.modules["pkg_resources"] = mock_pkg
+
+# 3. SEGURANÇA: Desligar telemetria
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGSMITH_API_KEY"] = "disabled"
 
-# 3. SÓ AGORA importamos as bibliotecas pesadas
+# 4. SÓ AGORA importamos as bibliotecas pesadas!
 from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
 from duckduckgo_search import DDGS
