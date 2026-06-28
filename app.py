@@ -178,6 +178,9 @@ if st.button("🚀 Iniciar Caçada em Lote"):
                     except Exception as erro_ia:
                         st.error(f"Erro na IA: {erro_ia}")
 
+    except Exception as e:
+        st.error(f"Erro crítico no motor de IA: {e}")
+
 # --- TERMINAL DE DISPARO GLOBAL ---
 st.markdown("---")
 st.markdown("### ⚡ Terminal de Execução Global")
