@@ -60,11 +60,16 @@ class AIAgentManager:
             Agent: Agente configurado para análise de dados
         """
         config = AGENT_PROMPTS["data_analyst"]
+        
+        # 1. Inicializa a ferramenta de raspagem AQUI
+        ferramenta_raspagem = ScrapeWebsiteTool()
+        
         return Agent(
             role=config["role"],
             goal=config["goal"],
             backstory=config["backstory"],
             llm=self.llm,
+            tools=[ferramenta_raspagem], # <--- 2. A ferramenta entra exatamente AQUI, seguida de vírgula
             allow_delegation=False,
             verbose=True
         )
