@@ -1,10 +1,9 @@
 import sys
 import types
 import os
-import time
 import requests
 import smtplib
-import urllib.parse  # <-- NOVA ARMA: Para gerar links dinâmicos do Wpp e LinkedIn
+import urllib.parse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -28,7 +27,7 @@ os.environ["LANGSMITH_API_KEY"] = "disabled"
 from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-st.title("🎯 Motor SDR Autônomo - Next Tier Up")
+st.title("🎯 Motor SDR Autônomo - Next Tier Up (Modo Batching)")
 
 with st.sidebar:
     st.header("⚙️ Chave de IA")
@@ -69,8 +68,7 @@ def bot_pncp():
                 if c.get('niFornecedor'):
                     leads.append({
                         "alvo": c.get('nomeRazaoSocialFornecedor'),
-                        "contexto": f"Ganhou licitação hoje para: {c.get('objetoContrato', 'Serviços/Obras')}",
-                        "sinal": "Vitória em Licitação Pública"
+                        "contexto": f"Ganhou licitação para: {c.get('objetoContrato', 'Serviços/Obras')}"
                     })
         return leads
     except Exception as e:
@@ -80,17 +78,15 @@ def bot_pncp():
 def bot_sniper_nicho(termo):
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": termo, "format": "json", "limit": 10, "addressdetails": 1}
-    headers = {"User-Agent": "MotorSDR_NextTierUp_Bot/2.0"}
+    headers = {"User-Agent": "MotorSDR_NextTierUp_Bot/3.0"}
     try:
         resposta = requests.get(url, params=params, headers=headers, timeout=10)
         leads = []
         if resposta.status_code == 200:
-            dados = resposta.json()
-            for r in dados:
+            for r in resposta.json():
                 leads.append({
                     "alvo": r.get('display_name', '').split(',')[0],
-                    "contexto": f"Endereço: {r.get('display_name', '')}",
-                    "sinal": f"Operação comercial ativa confirmada."
+                    "contexto": f"Endereço: {r.get('display_name', '')}"
                 })
         return leads
     except Exception as e:
@@ -110,17 +106,16 @@ def bot_osint_receita(cnpj):
             socios = [s.get('nome') for s in dados.get('qsa', [])]
             leads.append({
                 "alvo": dados.get('nome'),
-                "contexto": f"Capital: R$ {dados.get('capital_social')}. Atividade: {dados.get('atividade_principal', [{}])[0].get('text', '')}. Sócios: {', '.join(socios)}",
-                "sinal": "Análise Estratégica Societária"
+                "contexto": f"Capital: R$ {dados.get('capital_social')}. Sócios: {', '.join(socios)}"
             })
         return leads
     except Exception as e:
         st.error(f"⚠️ Erro CNPJ: {e}")
         return []
 
-# --- MOTOR PRINCIPAL E EXECUÇÃO ---
+# --- MOTOR PRINCIPAL E EXECUÇÃO (LOTE) ---
 
-if st.button("🚀 Iniciar Caçada e Gerar Cadências"):
+if st.button("🚀 Iniciar Caçada em Lote"):
     if not chave_api:
         st.error("⚠️ Insira a chave do Gemini.")
         st.stop()
@@ -132,21 +127,21 @@ if st.button("🚀 Iniciar Caçada e Gerar Cadências"):
         motor_gemini = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         
         agente_dados = Agent(
-            role="Analista de Inteligência", 
-            goal="Analisar a empresa alvo.", 
-            backstory="Expert B2B que acha dores operacionais.", 
+            role="Analista de Inteligência Operacional", 
+            goal="Analisar um lote de empresas de uma só vez.", 
+            backstory="Você processa listas brutas de prospecção.", 
             llm=motor_gemini, allow_delegation=False
         )
         
         agente_sdr = Agent(
-            role="SDR Omnichannel", 
-            goal="Escrever E-mail, Mensagem de LinkedIn e Script de Ligação.", 
-            backstory="Closer de elite focado em Receita Previsível. Você SEMPRE divide sua resposta em 3 blocos claros: [E-MAIL], [LINKEDIN] e [CALL].", 
+            role="SDR de Alta Escala", 
+            goal="Gerar cadências omnichannel rápidas para uma lista de empresas.", 
+            backstory="Você cria abordagens curtas e agressivas focadas em conversão. Para cada empresa da lista, gere os blocos: [E-MAIL], [LINKEDIN] e [CALL].", 
             llm=motor_gemini, allow_delegation=False
         )
         
         with area_processamento:
-            with st.spinner("Extraindo alvos..."):
+            with st.spinner("Extraindo lote de alvos..."):
                 if estrategia == "1. Radar de Licitações (Automático)": leads = bot_pncp()
                 elif estrategia == "2. Sniper B2B de Nicho (Automático)": leads = bot_sniper_nicho(termo_busca)
                 else: leads = bot_osint_receita(cnpj_alvo)
@@ -154,75 +149,78 @@ if st.button("🚀 Iniciar Caçada e Gerar Cadências"):
             if not leads:
                 st.warning("Nenhum alvo encontrado.")
             else:
-                st.success(f"🔥 {len(leads)} alvos interceptados! Iniciando IA...")
+                st.success(f"🔥 Lote de {len(leads)} alvos montado. Injetando no Cérebro da IA...")
                 
-                for idx, lead in enumerate(leads):
-                    with st.expander(f"🎯 Alvo: {lead['alvo']}", expanded=True):
-                        st.write(f"**Sinal:** {lead['contexto']}")
+                # EMPACOTAMENTO DOS DADOS
+                lote_texto = "\n".join([f"- Empresa: {l['alvo']} | Dados: {l['contexto']}" for l in leads])
+                
+                t1 = Task(
+                    description=f"Leia a seguinte lista de empresas extraídas da web:\n{lote_texto}\n\nFaça um resumo rápido da dor comercial de cada uma.", 
+                    expected_output="Análise em lote.", 
+                    agent=agente_dados
+                )
+                t2 = Task(
+                    description="Com base na análise do lote, crie uma cadência para CADA empresa da lista. Formate a resposta claramente separando as empresas e os canais de comunicação.", 
+                    expected_output="Relatório Mestre de Prospecção.", 
+                    agent=agente_sdr
+                )
+                
+                crew = Crew(agents=[agente_dados, agente_sdr], tasks=[t1, t2], process=Process.sequential)
+                
+                with st.spinner("Processando cadências em paralelo (Batching)..."):
+                    try:
+                        copy_gerada = str(crew.kickoff())
                         
-                        t1 = Task(description=f"Analise: {lead['alvo']}. Contexto: {lead['contexto']}.", expected_output="Dor mapeada.", agent=agente_dados)
-                        t2 = Task(description=f"Crie uma cadência B2B para fechar com {lead['alvo']}. Divida em 3 partes: 1) E-mail curto. 2) Mensagem de LinkedIn. 3) Abertura de Cold Call.", expected_output="Cadência completa dividida por canais.", agent=agente_sdr)
+                        st.markdown("### 🧠 Relatório Mestre de Prospecção")
+                        st.info("Aqui estão todas as estratégias geradas em um único fluxo. Use o terminal abaixo para executar.")
+                        st.markdown(copy_gerada)
                         
-                        crew = Crew(agents=[agente_dados, agente_sdr], tasks=[t1, t2], process=Process.sequential)
-                        
-                        try:
-                            copy_gerada = str(crew.kickoff())
-                            
-                            # PAINEL OMNICHANNEL 100% ATIVADO
-                            aba_email, aba_wpp, aba_linkedin = st.tabs(["✉️ E-mail", "📱 WhatsApp / Call", "💼 LinkedIn"])
-                            
-                            with aba_email:
-                                dest = st.text_input("E-mail do Lead:", key=f"dest_{idx}")
-                                assunto = st.text_input("Assunto do E-mail:", value=f"Estratégia para {lead['alvo']}", key=f"ass_{idx}")
-                                corpo_email = st.text_area("Edite a Copy (A IA gerou a cadência completa aqui, apague o que não for e-mail):", value=copy_gerada, height=200, key=f"copy_email_{idx}")
-                                
-                                if st.button("🚀 Disparar E-mail Frio", key=f"btn_{idx}"):
-                                    if not remetente_email or not remetente_senha:
-                                        st.error("Preencha seu E-mail e Senha de App na barra lateral!")
-                                    elif not dest:
-                                        st.error("Preencha o e-mail de destino.")
-                                    else:
-                                        try:
-                                            msg = MIMEMultipart()
-                                            msg['From'] = remetente_email
-                                            msg['To'] = dest
-                                            msg['Subject'] = assunto
-                                            msg.attach(MIMEText(corpo_email, 'plain'))
-                                            
-                                            server = smtplib.SMTP('smtp.gmail.com', 587)
-                                            server.starttls()
-                                            server.login(remetente_email, remetente_senha)
-                                            server.send_message(msg)
-                                            server.quit()
-                                            st.success(f"Vitória! E-mail disparado para {dest} 🎯")
-                                        except Exception as err:
-                                            st.error(f"Erro no servidor SMTP: {err}")
-                                            
-                            with aba_wpp:
-                                st.markdown("### Gatilho de Ligação e WhatsApp")
-                                st.info("Use a aba de E-mail acima para ler o script de ligação gerado pela IA e copie a mensagem de WhatsApp.")
-                                telefone = st.text_input("WhatsApp do Lead (Apenas números, ex: 5534999999999):", key=f"tel_{idx}")
-                                wpp_msg = st.text_area("Cole a mensagem para o WhatsApp aqui:", key=f"wpp_msg_{idx}")
-                                
-                                if telefone:
-                                    msg_codificada = urllib.parse.quote(wpp_msg)
-                                    link_whatsapp = f"https://wa.me/{telefone}?text={msg_codificada}"
-                                    st.markdown(f"👉 **[ABRIR WHATSAPP WEB COM MENSAGEM PRONTA]({link_whatsapp})**")
+                    except Exception as erro_ia:
+                        st.error(f"Erro na IA: {erro_ia}")
 
-                            with aba_linkedin:
-                                st.markdown("### Caçador de Decisores no LinkedIn")
-                                st.write("Não perca tempo procurando manualmente. Clique abaixo para rodar o raio-X no LinkedIn:")
-                                
-                                # Criamos um link dinâmico de pesquisa que filtra por Cargos de Liderança + Nome da Empresa
-                                empresa_codificada = urllib.parse.quote(lead['alvo'])
-                                query_linkedin = f"CEO OR Diretor OR Sócio {empresa_codificada}"
-                                link_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={urllib.parse.quote(query_linkedin)}"
-                                
-                                st.markdown(f"👉 **[PESQUISAR DECISORES DA {lead['alvo']} NO LINKEDIN]({link_linkedin})**")
-                                
-                        except Exception as erro_ia:
-                            st.error(f"Erro na IA: {erro_ia}")
-                    time.sleep(1)
-                    
-    except Exception as e:
-        st.error(f"Erro crítico no motor de IA: {e}")
+# --- TERMINAL DE DISPARO GLOBAL ---
+st.markdown("---")
+st.markdown("### ⚡ Terminal de Execução Global")
+aba_email, aba_wpp, aba_linkedin = st.tabs(["✉️ Disparo de E-mail", "📱 WhatsApp Automático", "💼 Busca Rápida LinkedIn"])
+
+with aba_email:
+    dest_global = st.text_input("E-mail do Alvo:")
+    assunto_global = st.text_input("Assunto do E-mail:")
+    corpo_global = st.text_area("Cole a Copy Gerada no Relatório Acima:", height=150)
+    
+    if st.button("🚀 Disparar E-mail"):
+        if not remetente_email or not remetente_senha:
+            st.error("Preencha seu E-mail e Senha de App na barra lateral!")
+        elif not dest_global:
+            st.error("Preencha o e-mail de destino.")
+        else:
+            try:
+                msg = MIMEMultipart()
+                msg['From'] = remetente_email
+                msg['To'] = dest_global
+                msg['Subject'] = assunto_global
+                msg.attach(MIMEText(corpo_global, 'plain'))
+                
+                server = smtplib.SMTP('smtp.gmail.com', 587)
+                server.starttls()
+                server.login(remetente_email, remetente_senha)
+                server.send_message(msg)
+                server.quit()
+                st.success(f"Vitória! E-mail disparado para {dest_global} 🎯")
+            except Exception as err:
+                st.error(f"Erro no servidor SMTP: {err}")
+
+with aba_wpp:
+    telefone_global = st.text_input("WhatsApp (Ex: 5534999999999):")
+    wpp_msg_global = st.text_area("Cole a copy de WhatsApp/Call:")
+    
+    if telefone_global:
+        msg_codificada = urllib.parse.quote(wpp_msg_global)
+        st.markdown(f"👉 **[ABRIR WHATSAPP WEB COM A MENSAGEM]({f'https://wa.me/{telefone_global}?text={msg_codificada}'})**")
+
+with aba_linkedin:
+    empresa_alvo = st.text_input("Digite o nome da Empresa para buscar os decisores:")
+    if empresa_alvo:
+        query_linkedin = f"CEO OR Diretor OR Sócio {urllib.parse.quote(empresa_alvo)}"
+        link_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={query_linkedin}"
+        st.markdown(f"👉 **[PESQUISAR DECISORES NO LINKEDIN]({link_linkedin})**")
