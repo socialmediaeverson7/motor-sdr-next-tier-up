@@ -3,25 +3,24 @@ import types
 import os
 import time
 import requests
-import re  # <-- NOSSA NOVA ARMA: Expressões Regulares para garimpar dados brutos
 from datetime import datetime
 import streamlit as st
 
-# 1. A REGRA DE OURO DO STREAMLIT: A interface gráfica SEMPRE primeiro!
+# 1. A REGRA DE OURO DO STREAMLIT
 st.set_page_config(page_title="Motor SDR - Next Tier Up", page_icon="🎯", layout="wide")
 
-# 2. O MÓDULO FANTASMA: Injetamos o bypass na memória antes do CrewAI acordar
+# 2. O MÓDULO FANTASMA
 if "pkg_resources" not in sys.modules:
     mock_pkg = types.ModuleType("pkg_resources")
     mock_pkg.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
     sys.modules["pkg_resources"] = mock_pkg
 
-# 3. SEGURANÇA: Desligar telemetria
+# 3. SEGURANÇA
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGSMITH_API_KEY"] = "disabled"
 
-# 4. SÓ AGORA importamos as bibliotecas pesadas!
+# 4. BIBLIOTECAS PESADAS
 from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -34,10 +33,15 @@ with st.sidebar:
     st.header("🔎 Escolha o Alvo")
     estrategia = st.radio(
         "Fonte de Leads:",
-        ["Licitações (PNCP)", "OSINT LinkedIn (Decisores)", "Sniper SDR (Negócios Locais)"]
+        ["Licitações (PNCP)", "OSINT Profundo (Raio-X de CNPJ)", "Sniper SDR (Negócios Locais)"]
     )
+    
+    # Campo dinâmico: Só aparece se a opção de CNPJ for escolhida
+    cnpj_alvo = ""
+    if estrategia == "OSINT Profundo (Raio-X de CNPJ)":
+        cnpj_alvo = st.text_input("Digite o CNPJ (somente números):")
 
-# --- BOTS DE EXTRAÇÃO ---
+# --- BOTS DE EXTRAÇÃO (100% REST APIs Blindadas) ---
 
 def bot_pncp():
     hoje = datetime.now().strftime("%Y%m%d")
@@ -58,48 +62,37 @@ def bot_pncp():
         st.error(f"⚠️ Erro no Bot do PNCP: {e}")
         return []
 
-def bot_osint_linkedin():
-    # Dork otimizada para o Bing
-    dork = 'site:br.linkedin.com/in "CEO" OR "Diretor" "Uberlândia"'
-    leads = []
+def bot_osint_receita(cnpj):
+    # Remove pontuações do CNPJ
+    cnpj_limpo = ''.join(filter(str.isdigit, cnpj))
+    if len(cnpj_limpo) != 14:
+        st.warning("⚠️ O CNPJ deve conter 14 números.")
+        return []
+        
+    url = f"https://receitaws.com.br/v1/cnpj/{cnpj_limpo}"
     try:
-        url = "https://www.bing.com/search"
-        # Forjamos a identidade de um navegador Chrome normal no Windows
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
-        }
-        params = {"q": dork}
-        
-        resposta = requests.get(url, headers=headers, params=params, timeout=15)
-        
+        resposta = requests.get(url, timeout=15)
+        leads = []
         if resposta.status_code == 200:
-            html = resposta.text
-            # Expressão Regular para "pescar" apenas os links de perfis do LinkedIn no meio do código HTML
-            links = re.findall(r'href="(https://br\.linkedin\.com/in/[^"]+)"', html)
-            
-            # Removemos duplicatas e pegamos os 3 primeiros
-            links_unicos = list(set(links))[:3] 
-            
-            if not links_unicos:
-                st.warning("⚠️ O Bing carregou, mas não encontrou perfis para essa busca.")
-            
-            for link in links_unicos:
-                # Extrai o nome da pessoa diretamente da URL do LinkedIn
-                nome_bruto = link.split('/in/')[-1].split('/')[0]
-                nome_limpo = nome_bruto.replace('-', ' ').title()
+            dados = resposta.json()
+            if dados.get("status") == "ERROR":
+                st.warning(f"⚠️ {dados.get('message')}")
+                return []
                 
-                leads.append({
-                    "alvo": nome_limpo,
-                    "contexto": f"Perfil de liderança mapeado via OSINT. Link do alvo: {link}",
-                    "sinal": "Decisor (CEO/Diretor) com perfil ativo na região alvo"
-                })
-        else:
-            st.error(f"⚠️ Firewall do Bing bloqueou. Status: {resposta.status_code}")
+            # Extraindo Quadro de Sócios (QSA)
+            socios = [s.get('nome') for s in dados.get('qsa', [])]
+            socios_str = ", ".join(socios) if socios else "Não listado"
             
+            leads.append({
+                "alvo": dados.get('nome'),
+                "contexto": f"Abertura: {dados.get('abertura')}. Capital Social: R$ {dados.get('capital_social')}. Atividade: {dados.get('atividade_principal', [{}])[0].get('text', '')}. Sócios: {socios_str}.",
+                "sinal": "Análise Estratégica Baseada em Maturidade e Estrutura Societária"
+            })
+        elif resposta.status_code == 429:
+            st.warning("⚠️ Limite de consultas da ReceitaWS atingido. Tente em 1 minuto.")
         return leads
     except Exception as e:
-        st.error(f"⚠️ Erro na raspagem OSINT: {e}")
+        st.error(f"⚠️ Erro na consulta de CNPJ: {e}")
         return []
 
 def bot_sniper_local():
@@ -134,6 +127,8 @@ def bot_sniper_local():
 if st.button("🚀 Iniciar Caçada de Leads"):
     if not chave_api:
         st.error("⚠️ Insira a sua chave do Gemini na barra lateral.")
+    elif estrategia == "OSINT Profundo (Raio-X de CNPJ)" and not cnpj_alvo:
+        st.error("⚠️ Digite um CNPJ válido na barra lateral para prosseguir.")
     else:
         area_processamento = st.container()
         os.environ["GOOGLE_API_KEY"] = chave_api
@@ -143,8 +138,8 @@ if st.button("🚀 Iniciar Caçada de Leads"):
             
             agente_dados = Agent(
                 role="Analista de OSINT e Inteligência", 
-                goal="Analisar os dados raspados da web e traçar um perfil corporativo.", 
-                backstory="Expert em inteligência de mercado B2B.", 
+                goal="Analisar os dados estruturados e traçar um perfil corporativo/financeiro.", 
+                backstory="Expert em inteligência de mercado B2B. Você cruza dados de idade da empresa e capital social para deduzir o nível de maturidade da operação comercial.", 
                 llm=motor_gemini,
                 allow_delegation=False
             )
@@ -152,39 +147,39 @@ if st.button("🚀 Iniciar Caçada de Leads"):
             agente_sdr = Agent(
                 role="SDR Especialista Omnichannel", 
                 goal="Criar cadências de prospecção fria de altíssima conversão.", 
-                backstory="Closer de elite. Sua especialidade é a Receita Previsível.", 
+                backstory="Closer de elite. Você usa os dados levantados pelo analista (como o nome dos sócios e o tamanho da empresa) para criar abordagens que parecem terem sido escritas por um consultor que estudou a empresa por horas.", 
                 llm=motor_gemini,
                 allow_delegation=False
             )
             
             with area_processamento:
-                with st.spinner(f"Acordando bots para a estratégia: {estrategia}..."):
+                with st.spinner(f"Executando operação: {estrategia}..."):
                     if estrategia == "Licitações (PNCP)":
                         leads = bot_pncp()
-                    elif estrategia == "OSINT LinkedIn (Decisores)":
-                        leads = bot_osint_linkedin()
+                    elif estrategia == "OSINT Profundo (Raio-X de CNPJ)":
+                        leads = bot_osint_receita(cnpj_alvo)
                     else:
                         leads = bot_sniper_local()
                 
                 if not leads:
-                    st.warning("Nenhum dado extraído. Tente ajustar os termos de busca.")
+                    st.warning("Nenhum dado extraído.")
                 else:
-                    st.success(f"🔥 Sistema interceptou {len(leads)} alvos na web!")
+                    st.success(f"🔥 Sistema interceptou o alvo com sucesso!")
                     
                     for lead in leads:
                         with st.container():
                             st.write(f"---")
                             st.write(f"**🎯 Alvo:** {lead['alvo']}")
-                            st.write(f"**📡 Sinal Detectado:** {lead['sinal']}")
+                            st.write(f"**📡 Dados Coletados:** {lead['contexto']}")
                             
                             t1 = Task(
-                                description=f"Analise o alvo: {lead['alvo']}. Contexto: '{lead['contexto']}'. Sinal: '{lead['sinal']}'. Descreva as dores operacionais e comerciais desse alvo hoje.",
+                                description=f"Analise o alvo: {lead['alvo']}. Contexto: '{lead['contexto']}'. Descreva as dores operacionais e comerciais que uma empresa com essas características (idade, capital, nicho) provavelmente enfrenta hoje.",
                                 expected_output="Análise rápida do perfil e hipótese de dor comercial.",
                                 agent=agente_dados
                             )
                             t2 = Task(
-                                description=f"Com base no perfil, crie uma cadência de prospecção B2B de 3 passos:\n1) E-mail Frio (usando o sinal {lead['sinal']}).\n2) Mensagem de LinkedIn.\n3) Script de Cold Call.",
-                                expected_output="Cadência com 1 E-mail, 1 Mensagem de LinkedIn e 1 Script de Ligação.",
+                                description=f"Com base no perfil, crie uma cadência de prospecção B2B de 3 passos para a Next Tier Up:\n1) E-mail Frio (mencione estrategicamente algum dado do contexto, como o tempo de mercado ou área de atuação, e se direcionando aos sócios se houver).\n2) Mensagem de LinkedIn.\n3) Script de Cold Call.",
+                                expected_output="Cadência estruturada contendo E-mail, Mensagem de LinkedIn e Script de Ligação.",
                                 agent=agente_sdr
                             )
                             
