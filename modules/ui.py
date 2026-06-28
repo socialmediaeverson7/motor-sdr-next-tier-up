@@ -23,13 +23,33 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
     Returns:
         Tuple: (api_key, sender_email, sender_password, strategy, search_term/cnpj)
     """
+    # Tentar carregar chaves automáticas
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    # Prioridade: 1. st.secrets, 2. os.environ (.env), 3. Vazio
+    default_api_key = ""
+    try:
+        default_api_key = st.secrets.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
+    except:
+        default_api_key = os.getenv("GOOGLE_API_KEY", "")
+
+    default_email = os.getenv("SENDER_EMAIL", "")
+    default_password = os.getenv("SENDER_PASSWORD", "")
+
     with st.sidebar:
         st.header("⚙️ Chave de IA")
-        api_key = st.text_input("Cole sua Chave do Gemini:", type="password", help="Obtenha sua chave em: https://aistudio.google.com/app/apikey")
+        api_key = st.text_input(
+            "Chave do Gemini:", 
+            value=default_api_key, 
+            type="password", 
+            help="Carregada automaticamente de .env ou st.secrets se disponível."
+        )
         
         st.header("✉️ Credenciais de Disparo (Canal 1)")
-        sender_email = st.text_input("Seu E-mail (Gmail/Workspace):", placeholder="seuemail@gmail.com")
-        sender_password = st.text_input("Senha de App (Google):", type="password")
+        sender_email = st.text_input("Seu E-mail (Gmail/Workspace):", value=default_email, placeholder="seuemail@gmail.com")
+        sender_password = st.text_input("Senha de App (Google):", value=default_password, type="password")
         
         st.header("🔎 Arsenal de Prospecção")
         strategy = st.radio(
