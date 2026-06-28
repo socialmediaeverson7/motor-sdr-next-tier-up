@@ -3,6 +3,7 @@ import types
 import os
 import time
 import requests
+import re  # <-- NOSSA NOVA ARMA: Expressões Regulares para garimpar dados brutos
 from datetime import datetime
 import streamlit as st
 
@@ -23,7 +24,6 @@ os.environ["LANGSMITH_API_KEY"] = "disabled"
 # 4. SÓ AGORA importamos as bibliotecas pesadas!
 from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
-from duckduckgo_search import DDGS
 
 st.title("🎯 Motor SDR Autônomo - Next Tier Up")
 
@@ -59,22 +59,47 @@ def bot_pncp():
         return []
 
 def bot_osint_linkedin():
+    # Dork otimizada para o Bing
     dork = 'site:br.linkedin.com/in "CEO" OR "Diretor" "Uberlândia"'
     leads = []
     try:
-        with DDGS() as ddgs:
-            resultados = list(ddgs.text(dork, max_results=3, backend="html"))
-            if not resultados:
-                st.warning("⚠️ Firewall do buscador bloqueou a raspagem silenciosamente.")
-            for r in resultados:
+        url = "https://www.bing.com/search"
+        # Forjamos a identidade de um navegador Chrome normal no Windows
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+        }
+        params = {"q": dork}
+        
+        resposta = requests.get(url, headers=headers, params=params, timeout=15)
+        
+        if resposta.status_code == 200:
+            html = resposta.text
+            # Expressão Regular para "pescar" apenas os links de perfis do LinkedIn no meio do código HTML
+            links = re.findall(r'href="(https://br\.linkedin\.com/in/[^"]+)"', html)
+            
+            # Removemos duplicatas e pegamos os 3 primeiros
+            links_unicos = list(set(links))[:3] 
+            
+            if not links_unicos:
+                st.warning("⚠️ O Bing carregou, mas não encontrou perfis para essa busca.")
+            
+            for link in links_unicos:
+                # Extrai o nome da pessoa diretamente da URL do LinkedIn
+                nome_bruto = link.split('/in/')[-1].split('/')[0]
+                nome_limpo = nome_bruto.replace('-', ' ').title()
+                
                 leads.append({
-                    "alvo": r.get('title', '').split('-')[0].strip(),
-                    "contexto": f"Resumo: {r.get('body', '')} | Link: {r.get('href', '')}",
-                    "sinal": "Mudança de cargo recente ou perfil ativo"
+                    "alvo": nome_limpo,
+                    "contexto": f"Perfil de liderança mapeado via OSINT. Link do alvo: {link}",
+                    "sinal": "Decisor (CEO/Diretor) com perfil ativo na região alvo"
                 })
+        else:
+            st.error(f"⚠️ Firewall do Bing bloqueou. Status: {resposta.status_code}")
+            
         return leads
     except Exception as e:
-        st.error(f"⚠️ Bloqueio no Radar LinkedIn: {e}")
+        st.error(f"⚠️ Erro na raspagem OSINT: {e}")
         return []
 
 def bot_sniper_local():
@@ -142,7 +167,7 @@ if st.button("🚀 Iniciar Caçada de Leads"):
                         leads = bot_sniper_local()
                 
                 if not leads:
-                    st.warning("O bot não conseguiu extrair dados no momento.")
+                    st.warning("Nenhum dado extraído. Tente ajustar os termos de busca.")
                 else:
                     st.success(f"🔥 Sistema interceptou {len(leads)} alvos na web!")
                     
