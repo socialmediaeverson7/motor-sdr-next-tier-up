@@ -1,6 +1,20 @@
+# 1. PRIMEIRO: Importamos apenas as bibliotecas nativas do sistema
 import os
 import sys
 import types
+
+# 2. SEGUNDO: Fazemos a injeção do fantasma na memória (O Bypass)
+if "pkg_resources" not in sys.modules:
+    mock_pkg = types.ModuleType("pkg_resources")
+    mock_pkg.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
+    sys.modules["pkg_resources"] = mock_pkg
+
+# 3. TERCEIRO: Desligamos os rastreadores
+os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGSMITH_API_KEY"] = "disabled"
+
+# 4. QUARTO: SÓ AGORA importamos as bibliotecas pesadas!
 import time
 import requests
 from datetime import datetime
@@ -9,15 +23,7 @@ from crewai import Agent, Task, Crew, Process
 from langchain_google_genai import ChatGoogleGenerativeAI
 from duckduckgo_search import DDGS
 
-# --- O GRANDE TRUQUE CONTRA O STREAMLIT CLOUD ---
-if "pkg_resources" not in sys.modules:
-    mock_pkg = types.ModuleType("pkg_resources")
-    mock_pkg.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
-    sys.modules["pkg_resources"] = mock_pkg
-
-os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
-os.environ["LANGCHAIN_TRACING_V2"] = "false"
-os.environ["LANGSMITH_API_KEY"] = "disabled"
+# --- INÍCIO DA INTERFACE ---
 
 st.set_page_config(page_title="Motor SDR - Next Tier Up", page_icon="🎯", layout="wide")
 st.title("🎯 Motor SDR Autônomo - Next Tier Up")
@@ -59,7 +65,7 @@ def bot_osint_linkedin():
         resultados = DDGS().text(dork, max_results=3)
         for r in resultados:
             leads.append({
-                "alvo": r.get('title', '').split('-')[0].strip(), # Pega o nome e cargo
+                "alvo": r.get('title', '').split('-')[0].strip(),
                 "contexto": f"Resumo do perfil: {r.get('body', '')} | Link: {r.get('href', '')}",
                 "sinal": "Mudança de cargo recente ou perfil ativo"
             })
