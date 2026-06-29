@@ -35,7 +35,6 @@ MAX_LEADS_PER_REQUEST = 1
 # CONFIGURAÇÕES DE MODELOS DE IA
 # ============================================================================
 
-# ATUALIZADO: Trocando o motor antigo (1.5) pelo modelo ativo atualizado (2.5)
 DEFAULT_LLM_MODEL = "gemini-1.5-flash"
 LLM_TEMPERATURE = 0.7
 
@@ -72,8 +71,8 @@ MESSAGES = {
 AGENT_PROMPTS = {
     "data_analyst": {
         "role": "Analista de Inteligência Operacional",
-        "goal": "Analisar um lote de empresas extraídas da web. VOCÊ DEVE USAR a sua ferramenta de raspagem (ScrapeWebsiteTool) para buscar e ler o site real dessas empresas. Extraia informações sobre os serviços que prestam e deduza dores comerciais baseadas no que você leu na página deles.",
-        "backstory": "Você é um expert em OSINT e inteligência de mercado B2B. Você tem permissão para acessar a internet. Você nunca inventa dados; você usa o web scraping para ler o conteúdo real dos sites das empresas alvo e descobrir seus verdadeiros gargalos operacionais.",
+        "goal": "Analisar um lote de empresas de uma só vez, identificando oportunidades e dores comerciais.",
+        "backstory": "Você é um especialista em análise de dados comerciais que processa listas brutas de prospecção e extrai insights valiosos.",
     },
     "sdr": {
         "role": "SDR de Alta Escala",

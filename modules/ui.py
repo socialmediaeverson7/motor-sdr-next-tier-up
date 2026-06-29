@@ -47,6 +47,12 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
             help="Carregada automaticamente de .env ou st.secrets se disponível."
         )
         
+        with st.expander("🛠️ Ferramentas MCP (Opcional)"):
+            tavily_key = st.text_input("Tavily/Brave API Key:", value=os.getenv("TAVILY_API_KEY", ""), type="password")
+            if tavily_key:
+                os.environ["TAVILY_API_KEY"] = tavily_key
+            st.caption("Ativa pesquisa web profunda para os agentes.")
+        
         st.header("✉️ Credenciais de Disparo (Canal 1)")
         sender_email = st.text_input("Seu E-mail (Gmail/Workspace):", value=default_email, placeholder="seuemail@gmail.com")
         sender_password = st.text_input("Senha de App (Google):", value=default_password, type="password")
