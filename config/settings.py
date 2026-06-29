@@ -36,7 +36,7 @@ MAX_LEADS_PER_REQUEST = 1
 # ============================================================================
 
 # ATUALIZADO: Trocando o motor antigo (1.5) pelo modelo ativo atualizado (2.5)
-DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+DEFAULT_LLM_MODEL = "gemini-1.5-flash"
 LLM_TEMPERATURE = 0.7
 
 # ============================================================================

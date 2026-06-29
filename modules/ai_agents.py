@@ -1,8 +1,7 @@
 import os
 import streamlit as st
 from typing import List, Optional
-from crewai import Agent, Task, Crew, Process
-from langchain_google_genai import ChatGoogleGenerativeAI
+from crewai import Agent, Task, Crew, Process, LLM
 from crewai_tools import ScrapeWebsiteTool
 from config.settings import DEFAULT_LLM_MODEL, LLM_TEMPERATURE, AGENT_PROMPTS, TASK_TEMPLATES
 
@@ -23,7 +22,11 @@ class AIAgentManager:
 
     def _get_llm(self):
         # Retorna uma nova instância a cada chamada para evitar conflitos de validação
-        return ChatGoogleGenerativeAI(**self.llm_config)
+        return LLM(
+            model=self.llm_config["model"],
+            temperature=self.llm_config["temperature"],
+            api_key=self.api_key
+        )
     
     def create_data_analyst_agent(self) -> Agent:
         config = AGENT_PROMPTS["data_analyst"]
