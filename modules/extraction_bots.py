@@ -1,13 +1,14 @@
 """
 Módulo de Bots de Extração de Leads
-Implementa diferentes estratégias para extrair dados de empresas-alvo
+Implementa diferentes estratégias para extrair dados de empresas-alvo com resiliência
 """
 
 import requests
 import streamlit as st
+import time
 from datetime import datetime
 from typing import List, Dict
-from config.settings import API_TIMEOUT, MAX_LEADS_PER_REQUEST, MESSAGES
+from config.settings import API_TIMEOUT, MAX_LEADS_PER_REQUEST, MESSAGES, API_RETRY_ATTEMPTS
 
 
 class LeadExtractionError(Exception):
@@ -26,50 +27,48 @@ class PNCPBot:
     @staticmethod
     def extract() -> List[Dict[str, str]]:
         """
-        Extrai leads de licitações recentes do PNCP
-        
-        Returns:
-            List[Dict]: Lista de leads com 'alvo' e 'contexto'
-        
-        Raises:
-            LeadExtractionError: Se houver erro na requisição
+        Extrai leads de licitações recentes do PNCP com Retry Exponencial
         """
-        try:
-            hoje = datetime.now().strftime("%Y%m%d")
-            params = {
-                "dataInicial": hoje,
-                "dataFinal": hoje,
-                "pagina": 1
-            }
-            
-            response = requests.get(
-                PNCPBot.BASE_URL,
-                params=params,
-                headers={'accept': 'application/json'},
-                timeout=API_TIMEOUT
-            )
-            response.raise_for_status()
-            
-            leads = []
-            data = response.json().get('data', [])
-            
-            for contract in data[:MAX_LEADS_PER_REQUEST]:
-                if contract.get('niFornecedor'):
-                    leads.append({
-                        "alvo": contract.get('nomeRazaoSocialFornecedor', 'N/A'),
-                        "contexto": f"Ganhou licitação para: {contract.get('objetoContrato', 'Serviços/Obras')}"
-                    })
-            
-            return leads
-            
-        except requests.exceptions.RequestException as e:
-            error_msg = MESSAGES["error_pncp_bot"].format(error=str(e))
-            st.error(error_msg)
-            raise LeadExtractionError(f"PNCP Bot Error: {e}")
-        except Exception as e:
-            error_msg = MESSAGES["error_pncp_bot"].format(error=str(e))
-            st.error(error_msg)
-            raise LeadExtractionError(f"PNCP Bot Error: {e}")
+        for attempt in range(API_RETRY_ATTEMPTS):
+            try:
+                hoje = datetime.now().strftime("%Y%m%d")
+                params = {
+                    "dataInicial": hoje,
+                    "dataFinal": hoje,
+                    "pagina": 1
+                }
+                
+                response = requests.get(
+                    PNCPBot.BASE_URL,
+                    params=params,
+                    headers={'accept': 'application/json'},
+                    timeout=API_TIMEOUT
+                )
+                response.raise_for_status()
+                
+                leads = []
+                data = response.json().get('data', [])
+                
+                for contract in data[:MAX_LEADS_PER_REQUEST]:
+                    if contract.get('niFornecedor'):
+                        leads.append({
+                            "alvo": contract.get('nomeRazaoSocialFornecedor', 'N/A'),
+                            "contexto": f"Ganhou licitação para: {contract.get('objetoContrato', 'Serviços/Obras')}"
+                        })
+                
+                return leads
+                
+            except requests.exceptions.RequestException as e:
+                if attempt < API_RETRY_ATTEMPTS - 1:
+                    wait_time = (attempt + 1) * 5
+                    st.warning(f"⚠️ Tentativa {attempt + 1} falhou no PNCP. Tentando novamente em {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    error_msg = MESSAGES["error_pncp_bot"].format(error=str(e))
+                    st.error(error_msg)
+                    raise LeadExtractionError(f"PNCP Bot Error: {e}")
+            except Exception as e:
+                raise LeadExtractionError(f"Erro inesperado no PNCP: {e}")
 
 
 class SniperNichoBot:
@@ -84,15 +83,6 @@ class SniperNichoBot:
     def extract(search_term: str) -> List[Dict[str, str]]:
         """
         Extrai leads de um nicho e região específicos
-        
-        Args:
-            search_term: Termo de busca (ex: "Transportadora em Uberlândia")
-        
-        Returns:
-            List[Dict]: Lista de leads com 'alvo' e 'contexto'
-        
-        Raises:
-            LeadExtractionError: Se houver erro na requisição
         """
         try:
             params = {
@@ -125,20 +115,14 @@ class SniperNichoBot:
             
             return leads
             
-        except requests.exceptions.RequestException as e:
-            error_msg = MESSAGES["error_sniper_bot"].format(error=str(e))
-            st.error(error_msg)
-            raise LeadExtractionError(f"Sniper Nicho Bot Error: {e}")
         except Exception as e:
-            error_msg = MESSAGES["error_sniper_bot"].format(error=str(e))
-            st.error(error_msg)
+            st.error(f"Erro no Sniper Bot: {e}")
             raise LeadExtractionError(f"Sniper Nicho Bot Error: {e}")
 
 
 class OSINTReceitaBot:
     """
     Bot para extração de dados de empresas via CNPJ
-    Utiliza a API ReceitaWS para obter informações detalhadas
     """
     
     BASE_URL = "https://receitaws.com.br/v1/cnpj"
@@ -147,23 +131,10 @@ class OSINTReceitaBot:
     def extract(cnpj: str) -> List[Dict[str, str]]:
         """
         Extrai informações detalhadas de uma empresa via CNPJ
-        
-        Args:
-            cnpj: CNPJ da empresa (com ou sem formatação)
-        
-        Returns:
-            List[Dict]: Lista com um lead contendo dados da empresa
-        
-        Raises:
-            LeadExtractionError: Se houver erro na requisição ou CNPJ inválido
         """
         try:
             from modules.utils import clean_cnpj
-            
             cnpj_limpo = clean_cnpj(cnpj)
-            
-            if len(cnpj_limpo) != 14:
-                raise LeadExtractionError("CNPJ deve conter 14 dígitos")
             
             response = requests.get(
                 f"{OSINTReceitaBot.BASE_URL}/{cnpj_limpo}",
@@ -174,53 +145,36 @@ class OSINTReceitaBot:
             data = response.json()
             
             if data.get("status") == "ERROR":
-                raise LeadExtractionError("CNPJ não encontrado ou inválido")
-            
-            # Extrair informações dos sócios
-            partners = [s.get('nome') for s in data.get('qsa', [])]
-            partners_str = ', '.join(partners) if partners else "Não disponível"
+                raise LeadExtractionError("CNPJ não encontrado")
             
             lead = {
                 "alvo": data.get('nome', 'N/A'),
-                "contexto": f"Capital Social: R$ {data.get('capital_social', 'N/A')} | Sócios: {partners_str}"
+                "contexto": f"Atividade: {data.get('atividade_principal', [{}])[0].get('text', 'N/A')}"
             }
             
             return [lead]
             
-        except requests.exceptions.RequestException as e:
-            error_msg = MESSAGES["error_cnpj_bot"].format(error=str(e))
-            st.error(error_msg)
-            raise LeadExtractionError(f"OSINT Receita Bot Error: {e}")
-        except LeadExtractionError as e:
-            error_msg = MESSAGES["error_cnpj_bot"].format(error=str(e))
-            st.error(error_msg)
-            raise
         except Exception as e:
-            error_msg = MESSAGES["error_cnpj_bot"].format(error=str(e))
-            st.error(error_msg)
+            st.error(f"Erro no OSINT Bot: {e}")
             raise LeadExtractionError(f"OSINT Receita Bot Error: {e}")
 
 
 def get_leads_by_strategy(strategy: str, search_term: str = "", cnpj: str = "") -> List[Dict[str, str]]:
     """
-    Função auxiliar para extrair leads baseada na estratégia selecionada
-    
-    Args:
-        strategy: Estratégia de extração ("pncp", "sniper", "cnpj")
-        search_term: Termo de busca (para estratégia "sniper")
-        cnpj: CNPJ da empresa (para estratégia "cnpj")
-    
-    Returns:
-        List[Dict]: Lista de leads extraídos
+    Função auxiliar com lógica de Fallback Automático
     """
     try:
         if strategy == "pncp":
-            return PNCPBot.extract()
+            try:
+                return PNCPBot.extract()
+            except LeadExtractionError:
+                st.info("🔄 PNCP instável. Ativando Fallback: Buscando empresas de Tecnologia via Sniper...")
+                return SniperNichoBot.extract("Empresas de Tecnologia")
         elif strategy == "sniper":
             return SniperNichoBot.extract(search_term)
         elif strategy == "cnpj":
             return OSINTReceitaBot.extract(cnpj)
         else:
             raise LeadExtractionError(f"Estratégia desconhecida: {strategy}")
-    except LeadExtractionError:
-        raise
+    except Exception as e:
+        raise LeadExtractionError(str(e))
