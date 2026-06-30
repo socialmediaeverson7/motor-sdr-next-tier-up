@@ -27,7 +27,7 @@ STREAMLIT_CONFIG = {
 # CONFIGURAÇÕES DE TIMEOUTS E LIMITES
 # ============================================================================
 
-API_TIMEOUT = 15  # segundos
+API_TIMEOUT = 60  # segundos (aumentado para evitar timeout no PNCP)
 API_RETRY_ATTEMPTS = 3
 MAX_LEADS_PER_REQUEST = 1
 
