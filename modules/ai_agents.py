@@ -24,7 +24,7 @@ class AIAgentManager:
     Responsável por criar, configurar e executar agentes CrewAI
     """
     
-    def __init__(self, api_key: str = None, provider: str = "Google Gemini", ollama_model: str = "llama3"):
+    def __init__(self, api_key: str = None, provider: str = "Google Gemini", ollama_model: str = "qwen2.5-coder:7b"):
         """
         Inicializa o gerenciador de agentes com suporte a múltiplos provedores
         """
@@ -162,7 +162,7 @@ class AIAgentManager:
             raise AIAgentError(f"Erro crítico no motor de IA: {e}")
 
 
-def validate_and_initialize_ai(api_key: str = None, provider: str = "Google Gemini", ollama_model: str = "llama3") -> Optional[AIAgentManager]:
+def validate_and_initialize_ai(api_key: str = None, provider: str = "Google Gemini", ollama_model: str = "qwen2.5-coder:7b") -> Optional[AIAgentManager]:
     """
     Valida e inicializa o gerenciador de agentes de IA
     """
