@@ -21,49 +21,26 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
     Renderiza a barra lateral com inputs do usuário
     
     Returns:
-        Tuple: (api_key, sender_email, sender_password, strategy, search_term/cnpj)
+        Tuple: (ollama_model, sender_email, sender_password, strategy, search_term, cnpj_target)
     """
     # Tentar carregar chaves automáticas
     import os
     from dotenv import load_dotenv
     load_dotenv()
-    
-    # Prioridade: 1. st.secrets, 2. os.environ (.env), 3. Vazio
-    default_api_key = ""
-    try:
-        default_api_key = st.secrets.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
-    except:
-        default_api_key = os.getenv("GOOGLE_API_KEY", "")
 
     default_email = os.getenv("SENDER_EMAIL", "")
     default_password = os.getenv("SENDER_PASSWORD", "")
 
     with st.sidebar:
         st.header("⚙️ Configuração de IA")
-        ai_provider = st.selectbox(
-            "Provedor de IA:",
-            ["Google Gemini", "Ollama Local"],
-            index=0,
-            help="Escolha entre usar a nuvem (Gemini) ou sua máquina local (Ollama)."
+        st.info("🤖 **Ollama Local** - Nenhuma API necessária, roda na sua máquina!")
+        
+        ollama_model = st.text_input(
+            "Modelo Ollama:",
+            value="qwen2.5-coder:7b",
+            help="Certifique-se de que o Ollama está rodando e o modelo foi baixado (ollama run modelo)."
         )
-        
-        api_key = None
-        ollama_model = "llama3"
-        
-        if ai_provider == "Google Gemini":
-            api_key = st.text_input(
-                "Chave do Gemini:", 
-                value=default_api_key, 
-                type="password", 
-                help="Carregada automaticamente de .env ou st.secrets se disponível."
-            )
-        else:
-            ollama_model = st.text_input(
-                "Modelo Ollama:",
-                value="llama3",
-                help="Certifique-se de que o Ollama está rodando e o modelo foi baixado (ollama run modelo)."
-            )
-            st.info("💡 Dica: O Ollama deve estar rodando em http://localhost:11434")
+        st.info("💡 Dica: O Ollama deve estar rodando em http://localhost:11434")
         
         with st.expander("🛠️ Ferramentas MCP (Opcional)"):
             tavily_key = st.text_input("Tavily/Brave API Key:", value=os.getenv("TAVILY_API_KEY", ""), type="password")
@@ -93,7 +70,7 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
         elif strategy == "3. Raio-X de CNPJ (Manual)":
             cnpj_target = st.text_input("Digite o CNPJ (somente números):")
     
-    return ai_provider, api_key, ollama_model, sender_email, sender_password, strategy, search_term, cnpj_target
+    return ollama_model, sender_email, sender_password, strategy, search_term, cnpj_target
 
 
 def render_header():
