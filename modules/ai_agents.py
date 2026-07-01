@@ -34,7 +34,7 @@ class AIAgentManager:
                 # Configuração para Ollama
                 self.llm = Ollama(
                     model=ollama_model,
-                    base_url="http://localhost:11434"
+                    base_url="http://127.0.0.1:11434"
                 )
             else:
                 if not api_key or not api_key.strip():
