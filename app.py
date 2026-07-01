@@ -1,9 +1,6 @@
 """
 Motor SDR Autônomo - Next Tier Up (Modo Batching)
 Aplicação principal de prospecção e geração de cadências com IA
-
-Autor: Manus AI
-Versão: 2.0 (Refatorada)
 """
 
 import sys
@@ -57,7 +54,7 @@ if "processed_targets" not in st.session_state:
 ui.render_header()
 
 # Renderizar sidebar e obter inputs
-api_key, sender_email, sender_password, strategy, search_term, cnpj_target = ui.render_sidebar()
+ai_provider, api_key, ollama_model, sender_email, sender_password, strategy, search_term, cnpj_target = ui.render_sidebar()
 
 # Renderizar botão de iniciar caçada
 if ui.render_extraction_button():
@@ -71,13 +68,19 @@ if st.session_state.processing:
     processing_container = ui.render_processing_container()
     
     try:
-        # Validar chave de API
-        ai_manager = validate_and_initialize_ai(api_key)
-        if not ai_manager:
-            st.session_state.processing = False
-            st.stop()
+        # 1. Inicializar IA (Suporta Gemini e Ollama)
+        with st.status(f"🧠 Inicializando Cérebro da IA ({ai_provider})...", expanded=False) as status:
+            ai_manager = validate_and_initialize_ai(
+                api_key=api_key, 
+                provider=ai_provider, 
+                ollama_model=ollama_model
+            )
+            if not ai_manager:
+                st.session_state.processing = False
+                st.stop()
+            status.update(label="✅ IA Pronta!", state="complete")
         
-        # Extrair leads baseado na estratégia selecionada
+        # 2. Extrair leads baseado na estratégia selecionada
         with ui.show_spinner("Extraindo lote de alvos..."):
             strategy_map = {
                 "1. Radar de Licitações (Automático)": "pncp",
@@ -109,12 +112,12 @@ if st.session_state.processing:
         # Formatar leads para processamento
         batch_text = format_leads_for_batch(leads)
         
-        # Processar lote com IA
-        with ui.show_spinner("Processando cadências em paralelo (Batching)..."):
+        # 3. Processar lote com IA
+        with ui.show_spinner(f"Processando cadências via {ai_provider}..."):
             results = ai_manager.process_batch(batch_text)
             st.session_state.last_results = results
         
-        # Renderizar resultados
+        # 4. Renderizar resultados
         if results:
             ui.render_results(results)
             # Adicionar alvos ao histórico de processados
