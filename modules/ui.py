@@ -35,11 +35,17 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
         st.header("⚙️ Configuração de IA")
         st.info("🤖 **Ollama Local** - Nenhuma API necessária, roda na sua máquina!")
         
-        ollama_model = st.text_input(
-            "Modelo Ollama:",
-            value="qwen2.5-coder:7b",
-            help="Certifique-se de que o Ollama está rodando e o modelo foi baixado (ollama run modelo)."
+        # Seletor de modelo Ollama
+        ollama_model = st.selectbox(
+            "Selecione o Modelo Ollama:",
+            [
+                "qwen2.5-coder:7b",
+                "llama3.1:8b"
+            ],
+            index=0,
+            help="Escolha o modelo para suas análises. llama3.1:8b é mais potente para buscas de leads."
         )
+        
         st.info("💡 Dica: O Ollama deve estar rodando em http://localhost:11434")
         
         with st.expander("🛠️ Ferramentas MCP (Opcional)"):
