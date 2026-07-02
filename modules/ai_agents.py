@@ -7,10 +7,14 @@ import os
 import streamlit as st
 from typing import Optional, List
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 from crewai import Agent, Task, Crew, Process
 from langchain_community.llms import Ollama
 from config.settings import DEFAULT_LLM_MODEL, LLM_TEMPERATURE, AGENT_PROMPTS, TASK_TEMPLATES, MESSAGES
 from modules.mcp_tools import MCPToolManager
+
+# Desabilitar aviso de SSL
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class AIAgentError(Exception):
@@ -34,7 +38,7 @@ class AIAgentManager:
                 raise AIAgentError(
                     "❌ Ollama não está rodando em http://127.0.0.1:11434\n\n"
                     "Por favor, inicie o Ollama:\n"
-                    "  Windows: Abra o aplicativo Ollama\n"
+                    "  Windows: Abra o aplicativo Ollama ou execute 'ollama serve'\n"
                     "  Linux/Mac: Execute 'ollama serve' no terminal"
                 )
             
@@ -44,7 +48,7 @@ class AIAgentManager:
             self.llm = Ollama(
                 model=ollama_model,
                 base_url="http://127.0.0.1:11434",
-                request_timeout=60.0
+                request_timeout=120.0
             )
             
             # Inicializar ferramentas MCP
@@ -61,14 +65,26 @@ class AIAgentManager:
     def _check_ollama_availability(self) -> bool:
         """
         Verifica se o Ollama está rodando e disponível
+        Tenta múltiplos endpoints para garantir conectividade
         """
-        try:
-            response = requests.get("http://127.0.0.1:11434/api/tags", timeout=5)
-            return response.status_code == 200
-        except (requests.ConnectionError, requests.Timeout):
-            return False
-        except Exception:
-            return False
+        endpoints = [
+            "http://127.0.0.1:11434/api/tags",
+            "http://127.0.0.1:11434/api/version",
+            "http://localhost:11434/api/tags",
+        ]
+        
+        for endpoint in endpoints:
+            try:
+                response = requests.get(endpoint, timeout=5, verify=False)
+                if response.status_code == 200:
+                    st.info("✅ Ollama detectado e conectado!")
+                    return True
+            except (requests.ConnectionError, requests.Timeout, requests.RequestException):
+                continue
+            except Exception:
+                continue
+        
+        return False
     
     def create_data_analyst_agent(self) -> Agent:
         """
