@@ -28,7 +28,8 @@ class AIAgentManager:
     Responsável por criar, configurar e executar agentes CrewAI com Ollama Local
     """
     
-    def __init__(self, ollama_model: str = "qwen2.5-coder:7b"):
+    # ALTERADO: Modelo padrão focado em SDR e estruturação de dados (Llama 3.1)
+    def __init__(self, ollama_model: str = "llama3.1:8b"):
         """
         Inicializa o gerenciador de agentes com Ollama Local
         """
@@ -36,10 +37,8 @@ class AIAgentManager:
             # Verificar se Ollama está disponível
             if not self._check_ollama_availability():
                 raise AIAgentError(
-                    "❌ Ollama não está rodando em http://127.0.0.1:11434\n\n"
-                    "Por favor, inicie o Ollama:\n"
-                    "  Windows: Abra o aplicativo Ollama ou execute 'ollama serve'\n"
-                    "  Linux/Mac: Execute 'ollama serve' no terminal"
+                    "❌ Ollama não está respondendo localmente.\n\n"
+                    "Por favor, verifique se o ícone da Lhama está na barra de tarefas."
                 )
             
             st.info(f"🤖 Conectando ao Ollama Local (Modelo: {ollama_model})...")
@@ -65,17 +64,20 @@ class AIAgentManager:
     def _check_ollama_availability(self) -> bool:
         """
         Verifica se o Ollama está rodando e disponível
-        Tenta múltiplos endpoints para garantir conectividade
+        Tenta múltiplos endpoints e burla proxies do sistema
         """
         endpoints = [
             "http://127.0.0.1:11434/api/tags",
-            "http://127.0.0.1:11434/api/version",
-            "http://localhost:11434/api/tags",
+            "http://localhost:11434/api/tags"
         ]
+        
+        # ALTERADO: Sessão configurada para ignorar variáveis de Proxy do Windows
+        session = requests.Session()
+        session.trust_env = False 
         
         for endpoint in endpoints:
             try:
-                response = requests.get(endpoint, timeout=5, verify=False)
+                response = session.get(endpoint, timeout=5, verify=False)
                 if response.status_code == 200:
                     st.info("✅ Ollama detectado e conectado!")
                     return True
@@ -190,7 +192,7 @@ class AIAgentManager:
             raise AIAgentError(f"Erro crítico no motor de IA: {e}")
 
 
-def validate_and_initialize_ai(ollama_model: str = "qwen2.5-coder:7b") -> Optional[AIAgentManager]:
+def validate_and_initialize_ai(ollama_model: str = "llama3.1:8b") -> Optional[AIAgentManager]:
     """
     Valida e inicializa o gerenciador de agentes de IA com Ollama Local
     """
