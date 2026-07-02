@@ -63,29 +63,24 @@ class AIAgentManager:
     
     def _check_ollama_availability(self) -> bool:
         """
-        Verifica se o Ollama está rodando e disponível
-        Tenta múltiplos endpoints e burla proxies do sistema
+        Verifica se o Ollama está rodando batendo na porta principal,
+        exatamente como testado via terminal.
         """
-        endpoints = [
-            "http://127.0.0.1:11434/api/tags",
-            "http://localhost:11434/api/tags"
-        ]
+        # Usando a URL raiz que provamos estar funcionando
+        url = "http://127.0.0.1:11434"
         
-        # ALTERADO: Sessão configurada para ignorar variáveis de Proxy do Windows
         session = requests.Session()
         session.trust_env = False 
         
-        for endpoint in endpoints:
-            try:
-                response = session.get(endpoint, timeout=5, verify=False)
-                if response.status_code == 200:
-                    st.info("✅ Ollama detectado e conectado!")
-                    return True
-            except (requests.ConnectionError, requests.Timeout, requests.RequestException):
-                continue
-            except Exception:
-                continue
-        
+        try:
+            # Faz a mesma requisição do seu teste de terminal
+            response = session.get(url, timeout=5, verify=False)
+            if response.status_code == 200 and "Ollama is running" in response.text:
+                st.info("✅ Ollama detectado e conectado na porta raiz!")
+                return True
+        except Exception:
+            pass
+            
         return False
     
     def create_data_analyst_agent(self) -> Agent:
