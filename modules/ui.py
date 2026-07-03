@@ -1,87 +1,57 @@
 """
 Módulo de Interface do Usuário (Streamlit)
-Implementa todos os componentes da UI da aplicação
+Focado no uso do Ollama Local para independência total de APIs externas
 """
 
 import streamlit as st
-import urllib.parse
-from typing import Tuple
-from config.settings import STREAMLIT_CONFIG, MESSAGES
+import os
+from typing import Tuple, Optional
 
 
 def configure_page():
-    """
-    Configura as definições da página Streamlit
-    """
-    st.set_page_config(**STREAMLIT_CONFIG)
+    """Configura as definições básicas da página Streamlit"""
+    st.set_page_config(
+        page_title="Motor SDR v2.0 - Next Tier Up",
+        page_icon="🚀",
+        layout="wide"
+    )
 
 
 def render_sidebar() -> Tuple[str, str, str, str, str, str]:
     """
-    Renderiza a barra lateral com inputs do usuário
-    
-    Returns:
-        Tuple: (api_key, sender_email, sender_password, strategy, search_term/cnpj)
+    Renderiza a barra lateral e retorna as configurações do usuário
     """
-    # Tentar carregar chaves automáticas
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
-    
-    # Prioridade: 1. st.secrets, 2. os.environ (.env), 3. Vazio
-    default_api_key = ""
-    try:
-        default_api_key = st.secrets.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
-    except:
-        default_api_key = os.getenv("GOOGLE_API_KEY", "")
-
-    default_email = os.getenv("SENDER_EMAIL", "")
-    default_password = os.getenv("SENDER_PASSWORD", "")
-
     with st.sidebar:
         st.header("⚙️ Configuração de IA")
-        ai_provider = st.selectbox(
-            "Provedor de IA:",
-            ["Google Gemini", "Ollama Local"],
+        
+        st.success("⚡ Modo Ollama Local Ativo")
+        
+        ollama_model = st.selectbox(
+            "Selecione o Modelo Ollama:",
+            ["llama3.1:8b", "qwen2.5-coder:7b", "mistral", "gemma2", "personalizado"],
             index=0,
-            help="Escolha entre usar a nuvem (Gemini) ou sua máquina local (Ollama)."
+            help="Certifique-se de que o modelo foi baixado no Ollama (ex: ollama pull llama3.1:8b)."
         )
         
-        api_key = None
-        ollama_model = "llama3"
+        if ollama_model == "personalizado":
+            ollama_model = st.text_input("Digite o nome exato do modelo:", value="llama3.1:8b")
         
-        if ai_provider == "Google Gemini":
-            api_key = st.text_input(
-                "Chave do Gemini:", 
-                value=default_api_key, 
-                type="password", 
-                help="Carregada automaticamente de .env ou st.secrets se disponível."
-            )
-        else:
-            ollama_model = st.selectbox(
-                "Selecione o Modelo Ollama:",
-                ["llama3.1:8b", "qwen2.5-coder:7b", "mistral", "gemma2", "personalizado"],
-                index=0,
-                help="Certifique-se de que o modelo foi baixado no Ollama (ex: ollama pull llama3.1)."
-            )
-            if ollama_model == "personalizado":
-                ollama_model = st.text_input("Digite o nome do modelo:", value="llama3")
-            
-            st.info("💡 Dica: O Ollama deve estar rodando localmente.")
-        
-        with st.expander("🛠️ Ferramentas MCP (Opcional)"):
+        st.info("💡 Dica: O Ollama deve estar aberto na sua máquina.")
+
+        st.header("🛠️ Ferramentas MCP (Opcional)")
+        with st.expander("Configurar Pesquisa Web"):
             tavily_key = st.text_input("Tavily/Brave API Key:", value=os.getenv("TAVILY_API_KEY", ""), type="password")
             if tavily_key:
                 os.environ["TAVILY_API_KEY"] = tavily_key
-            st.caption("Ativa pesquisa web profunda para os agentes.")
-        
-        st.header("✉️ Credenciais de Disparo (Canal 1)")
-        sender_email = st.text_input("Seu E-mail (Gmail/Workspace):", value=default_email, placeholder="seuemail@gmail.com")
-        sender_password = st.text_input("Senha de App (Google):", value=default_password, type="password")
-        
-        st.header("🔎 Arsenal de Prospecção")
+            st.caption("Deixe em branco para usar DuckDuckGo (Grátis).")
+
+        st.header("✉️ Credenciais de Disparo")
+        sender_email = st.text_input("Seu E-mail (Gmail/Workspace):", value=os.getenv("SENDER_EMAIL", ""), placeholder="seuemail@gmail.com")
+        sender_password = st.text_input("Senha de App (Google):", value=os.getenv("SENDER_PASSWORD", ""), type="password")
+
+        st.header("🎯 Estratégia de Extração")
         strategy = st.radio(
-            "Selecione o Motor:",
+            "Escolha a fonte dos leads:",
             [
                 "1. Radar de Licitações (Automático)",
                 "2. Sniper B2B de Nicho (Automático)",
@@ -97,182 +67,99 @@ def render_sidebar() -> Tuple[str, str, str, str, str, str]:
         elif strategy == "3. Raio-X de CNPJ (Manual)":
             cnpj_target = st.text_input("Digite o CNPJ (somente números):")
     
-    return ai_provider, api_key, ollama_model, sender_email, sender_password, strategy, search_term, cnpj_target
+    return ollama_model, sender_email, sender_password, strategy, search_term, cnpj_target
 
 
 def render_header():
-    """
-    Renderiza o cabeçalho principal da aplicação
-    """
-    st.title("🎯 Motor SDR Autônomo - Next Tier Up (Modo Batching)")
-    st.markdown(
-        """
-        Inteligência comercial e prospecção automatizadas com IA.
-        
-        **Como funciona:**
-        1. Selecione uma estratégia de extração de leads
-        2. Clique em "Iniciar Caçada em Lote" para processar
-        3. A IA analisará os leads e gerará cadências personalizadas
-        4. Use o Terminal de Execução para disparar e-mails e mensagens
-        """
-    )
+    """Renderiza o cabeçalho da aplicação"""
+    st.title("🚀 Motor SDR v2.0 - Next Tier Up")
+    st.subheader("Inteligência Comercial Autônoma e Local (100% Offline via Ollama)")
+    st.markdown("---")
 
 
 def render_extraction_button() -> bool:
-    """
-    Renderiza o botão de iniciar extração
-    
-    Returns:
-        bool: True se o botão foi clicado
-    """
+    """Renderiza o botão de iniciar caçada"""
     return st.button("🚀 Iniciar Caçada em Lote", use_container_width=True)
 
 
 def render_processing_container():
-    """
-    Renderiza um container para feedback de processamento
-    
-    Returns:
-        Container do Streamlit
-    """
-    return st.container()
+    """Cria um container para exibir o progresso do processamento"""
+    return st.empty()
+
+
+def show_spinner(text: str):
+    """Exibe um spinner de carregamento"""
+    return st.spinner(text)
+
+
+def show_info_message(text: str):
+    """Exibe uma mensagem informativa"""
+    st.info(text)
+
+
+def show_warning_message(text: str):
+    """Exibe uma mensagem de aviso"""
+    st.warning(text)
+
+
+def show_error_message(text: str):
+    """Exibe uma mensagem de erro"""
+    st.error(text)
 
 
 def render_results(results: str):
-    """
-    Renderiza os resultados do processamento
-    
-    Args:
-        results: String com os resultados
-    """
-    st.markdown("### 🧠 Relatório Mestre de Prospecção")
-    st.info("Aqui estão todas as estratégias geradas em um único fluxo. Use o terminal abaixo para executar.")
+    """Renderiza os resultados do processamento"""
+    st.markdown("### 🎯 Relatório de Inteligência e Cadências")
     st.markdown(results)
+    st.download_button(
+        label="📥 Baixar Relatório (Markdown)",
+        data=results,
+        file_name="relatorio_sdr.md",
+        mime="text/markdown"
+    )
 
 
 def render_execution_terminal():
-    """
-    Renderiza o terminal de execução global com abas
-    
-    Returns:
-        Tuple: (tab_email, tab_whatsapp, tab_linkedin)
-    """
+    """Renderiza o terminal de execução para disparo de mensagens"""
     st.markdown("---")
-    st.markdown("### ⚡ Terminal de Execução Global")
-    
-    return st.tabs(["✉️ Disparo de E-mail", "📱 WhatsApp Automático", "💼 Busca Rápida LinkedIn"])
+    st.markdown("### ⚡ Terminal de Execução")
+    return st.tabs(["📧 E-mail Marketing", "💬 WhatsApp Sniper", "🔗 LinkedIn Connect"])
 
 
 def render_email_tab(tab):
-    """
-    Renderiza a aba de disparo de e-mail
-    
-    Args:
-        tab: Objeto da aba do Streamlit
-    
-    Returns:
-        Tuple: (recipient_email, subject, body, button_clicked)
-    """
+    """Renderiza a aba de e-mail"""
     with tab:
-        recipient_email = st.text_input("E-mail do Alvo:")
-        subject = st.text_input("Assunto do E-mail:")
-        body = st.text_area("Cole a Copy Gerada no Relatório Acima:", height=150)
-        button_clicked = st.button("🚀 Disparar E-mail", use_container_width=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            recipient = st.text_input("E-mail do Destinatário:", placeholder="contato@empresa.com")
+            subject = st.text_input("Assunto:", value="Oportunidade de Otimização")
+        with col2:
+            body = st.text_area("Corpo do E-mail:", height=200)
         
-        return recipient_email, subject, body, button_clicked
+        btn = st.button("📧 Disparar E-mail agora")
+        return recipient, subject, body, btn
 
 
 def render_whatsapp_tab(tab):
-    """
-    Renderiza a aba de WhatsApp automático
-    
-    Args:
-        tab: Objeto da aba do Streamlit
-    
-    Returns:
-        Tuple: (phone_number, message)
-    """
+    """Renderiza a aba de WhatsApp"""
     with tab:
-        phone_number = st.text_input("WhatsApp (Ex: 5534999999999):")
-        message = st.text_area("Cole a copy de WhatsApp/Call:")
+        col1, col2 = st.columns(2)
+        with col1:
+            phone = st.text_input("WhatsApp (com DDD):", placeholder="34999999999")
+        with col2:
+            msg = st.text_area("Mensagem:", height=150)
         
-        if phone_number and message:
-            encoded_message = urllib.parse.quote(message)
-            whatsapp_url = f"https://wa.me/{phone_number}?text={encoded_message}"
-            st.markdown(f"👉 **[ABRIR WHATSAPP WEB COM A MENSAGEM]({whatsapp_url})**")
-        
-        return phone_number, message
+        if st.button("💬 Abrir no WhatsApp Web"):
+            url = f"https://web.whatsapp.com/send?phone=55{phone}&text={msg}"
+            st.markdown(f'<a href="{url}" target="_blank">Clique aqui para enviar</a>', unsafe_allow_html=True)
+        return phone, msg
 
 
 def render_linkedin_tab(tab):
-    """
-    Renderiza a aba de busca rápida LinkedIn
-    
-    Args:
-        tab: Objeto da aba do Streamlit
-    
-    Returns:
-        str: Nome da empresa
-    """
+    """Renderiza a aba de LinkedIn"""
     with tab:
-        company_name = st.text_input("Digite o nome da Empresa para buscar os decisores:")
-        
-        if company_name:
-            query = f"CEO OR Diretor OR Sócio {urllib.parse.quote(company_name)}"
-            linkedin_url = f"https://www.linkedin.com/search/results/people/?keywords={query}"
-            st.markdown(f"👉 **[PESQUISAR DECISORES NO LINKEDIN]({linkedin_url})**")
-        
-        return company_name
-
-
-def show_info_message(message: str):
-    """
-    Exibe uma mensagem informativa
-    
-    Args:
-        message: Mensagem a exibir
-    """
-    st.info(message)
-
-
-def show_success_message(message: str):
-    """
-    Exibe uma mensagem de sucesso
-    
-    Args:
-        message: Mensagem a exibir
-    """
-    st.success(message)
-
-
-def show_warning_message(message: str):
-    """
-    Exibe uma mensagem de aviso
-    
-    Args:
-        message: Mensagem a exibir
-    """
-    st.warning(message)
-
-
-def show_error_message(message: str):
-    """
-    Exibe uma mensagem de erro
-    
-    Args:
-        message: Mensagem a exibir
-    """
-    st.error(message)
-
-
-def show_spinner(message: str):
-    """
-    Exibe um spinner de carregamento
-    
-    Args:
-        message: Mensagem a exibir
-    
-    Returns:
-        Context manager para o spinner
-    """
-    return st.spinner(message)
+        company = st.text_input("Nome da Empresa para busca:")
+        if st.button("🔗 Buscar Decisores no LinkedIn"):
+            url = f"https://www.linkedin.com/search/results/people/?keywords={company}%20decisor"
+            st.markdown(f'<a href="{url}" target="_blank">Ver resultados no LinkedIn</a>', unsafe_allow_html=True)
+        return company
