@@ -1,20 +1,17 @@
 """
 Módulo de Agentes de IA
-Implementa os agentes CrewAI para análise e geração de cadências com Ollama Local
+Implementa os agentes CrewAI para análise e geração de cadências com suporte a Gemini e Ollama
 """
 
 import os
 import streamlit as st
-from typing import Optional, List
-import requests
-from urllib3.exceptions import InsecureRequestWarning
+from typing import Tuple, Optional, List
 from crewai import Agent, Task, Crew, Process
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.llms import Ollama
+import requests
 from config.settings import DEFAULT_LLM_MODEL, LLM_TEMPERATURE, AGENT_PROMPTS, TASK_TEMPLATES, MESSAGES
 from modules.mcp_tools import MCPToolManager
-
-# Desabilitar aviso de SSL
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class AIAgentError(Exception):
@@ -25,63 +22,51 @@ class AIAgentError(Exception):
 class AIAgentManager:
     """
     Gerenciador de agentes de IA
-    Responsável por criar, configurar e executar agentes CrewAI com Ollama Local
+    Responsável por criar, configurar e executar agentes CrewAI
     """
     
-    # ALTERADO: Modelo padrão focado em SDR e estruturação de dados (Llama 3.1)
-    def __init__(self, ollama_model: str = "llama3.1:8b"):
+    def __init__(self, api_key: str = None, provider: str = "Google Gemini", ollama_model: str = "llama3"):
         """
-        Inicializa o gerenciador de agentes com Ollama Local
+        Inicializa o gerenciador de agentes com suporte a múltiplos provedores
         """
         try:
-            # Verificar se Ollama está disponível
-            if not self._check_ollama_availability():
-                raise AIAgentError(
-                    "❌ Ollama não está respondendo localmente.\n\n"
-                    "Por favor, verifique se o ícone da Lhama está na barra de tarefas."
+            if provider == "Ollama Local":
+                base_url = "http://localhost:11434"
+                # Verificação de saúde do servidor Ollama
+                try:
+                    health_check = requests.get(f"{base_url}/api/tags", timeout=2)
+                    if health_check.status_code != 200:
+                        raise AIAgentError("O servidor Ollama respondeu com erro.")
+                except Exception:
+                    raise AIAgentError("❌ Ollama não está respondendo localmente. Verifique se o app Ollama está aberto.")
+
+                st.info(f"🤖 Conectado ao Ollama Local (Modelo: {ollama_model})")
+                self.llm = Ollama(
+                    model=ollama_model,
+                    base_url=base_url,
+                    temperature=LLM_TEMPERATURE
                 )
-            
-            st.info(f"🤖 Conectando ao Ollama Local (Modelo: {ollama_model})...")
-            
-            # Inicializar Ollama
-            self.llm = Ollama(
-                model=ollama_model,
-                base_url="http://127.0.0.1:11434",
-                request_timeout=120.0
-            )
+            else:
+                if not api_key or not api_key.strip():
+                    raise AIAgentError("Chave de API do Gemini não fornecida")
+                
+                # Limpar espaços em branco extras que podem causar erro 400
+                clean_api_key = api_key.strip()
+                os.environ["GOOGLE_API_KEY"] = clean_api_key
+                
+                # Inicializar o modelo Gemini
+                self.llm = ChatGoogleGenerativeAI(
+                    model=DEFAULT_LLM_MODEL,
+                    temperature=LLM_TEMPERATURE,
+                    google_api_key=clean_api_key
+                )
             
             # Inicializar ferramentas MCP
             self.tool_manager = MCPToolManager()
             self.tools = self.tool_manager.get_all_tools()
             
-            st.success(f"✅ IA inicializada com sucesso usando Ollama Local ({ollama_model})")
-            
-        except AIAgentError:
-            raise
         except Exception as e:
-            raise AIAgentError(f"Erro ao inicializar Ollama: {e}")
-    
-    def _check_ollama_availability(self) -> bool:
-        """
-        Verifica se o Ollama está rodando batendo na porta principal,
-        exatamente como testado via terminal.
-        """
-        # Usando a URL raiz que provamos estar funcionando
-        url = "http://127.0.0.1:11434"
-        
-        session = requests.Session()
-        session.trust_env = False 
-        
-        try:
-            # Faz a mesma requisição do seu teste de terminal
-            response = session.get(url, timeout=5, verify=False)
-            if response.status_code == 200 and "Ollama is running" in response.text:
-                st.info("✅ Ollama detectado e conectado na porta raiz!")
-                return True
-        except Exception:
-            pass
-            
-        return False
+            raise AIAgentError(f"Erro ao inicializar modelo de IA ({provider}): {e}")
     
     def create_data_analyst_agent(self) -> Agent:
         """
@@ -187,12 +172,12 @@ class AIAgentManager:
             raise AIAgentError(f"Erro crítico no motor de IA: {e}")
 
 
-def validate_and_initialize_ai(ollama_model: str = "llama3.1:8b") -> Optional[AIAgentManager]:
+def validate_and_initialize_ai(api_key: str = None, provider: str = "Google Gemini", ollama_model: str = "llama3") -> Optional[AIAgentManager]:
     """
-    Valida e inicializa o gerenciador de agentes de IA com Ollama Local
+    Valida e inicializa o gerenciador de agentes de IA
     """
     try:
-        return AIAgentManager(ollama_model=ollama_model)
+        return AIAgentManager(api_key=api_key, provider=provider, ollama_model=ollama_model)
     except AIAgentError as e:
         st.error(f"Erro na inicialização da IA: {e}")
         return None
